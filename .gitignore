@@ -1,0 +1,10 @@
+.idea/
+
+# Project exclude paths
+/app/build/
+/app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/
+/.idea/
+local.properties
+
+# Project exclude paths
+/.gradle/
