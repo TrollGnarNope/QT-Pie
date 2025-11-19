@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,17 @@ plugins {
 
     id("com.google.gms.google-services")
     id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
+}
+
+// Helper to read secrets manually as a fallback
+fun getApiKey(propertyKey: String): String {
+    val secretsFile = rootProject.file("secrets.properties")
+    val properties = Properties()
+    if (secretsFile.exists()) {
+        properties.load(secretsFile.inputStream())
+        return properties.getProperty(propertyKey, "")
+    }
+    return ""
 }
 
 android {
@@ -19,6 +32,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // FIX: Explicitly inject the key into the manifest
+        manifestPlaceholders["MAPS_API_KEY"] = getApiKey("MAPS_API_KEY")
     }
 
     buildTypes {
@@ -68,6 +84,7 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)

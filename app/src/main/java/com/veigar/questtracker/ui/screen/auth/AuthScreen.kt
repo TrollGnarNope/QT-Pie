@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -54,7 +53,6 @@ import com.veigar.questtracker.R
 import com.veigar.questtracker.data.UserRepository
 import com.veigar.questtracker.data.VerificationThrottle
 import com.veigar.questtracker.ui.theme.CoralBlue
-import com.veigar.questtracker.ui.theme.CoralBlueDark
 import com.veigar.questtracker.ui.theme.TextSecondary
 import com.veigar.questtracker.viewmodel.AuthState
 import com.veigar.questtracker.viewmodel.AuthViewModel
@@ -103,7 +101,7 @@ fun AuthScreen(navController: NavHostController, viewModel: AuthViewModel = view
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = if (isLoginMode) "QuestTracker" else "Join QuestTracker", // Changed text to QuestTracker
+                text = if (isLoginMode) "QuestTracker" else "Join QuestTracker",
                 style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -116,7 +114,7 @@ fun AuthScreen(navController: NavHostController, viewModel: AuthViewModel = view
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // 📧 Email Field
+            // Email Field
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -128,7 +126,7 @@ fun AuthScreen(navController: NavHostController, viewModel: AuthViewModel = view
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 🔐 Password Field
+            // Password Field
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -220,7 +218,7 @@ fun AuthScreen(navController: NavHostController, viewModel: AuthViewModel = view
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 🌀 Error state
+            // Error and Message handling
             when (state) {
                 is AuthState.Error -> {
                     Text(
@@ -250,24 +248,22 @@ fun AuthScreen(navController: NavHostController, viewModel: AuthViewModel = view
         }
     }
 
-    // 🔁 Navigate on success
+    // Navigation Logic
     LaunchedEffect(state) {
         if (state is AuthState.Success) {
             val user = UserRepository.getUserProfile()
             val userRole = user?.role
-            
-            // If this is a new registration (user just created account), record verification email timestamp
-            // The verification email is sent automatically during registration
+
+            // Verify throttle tracking for new users
             val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
             if (currentUser != null && !currentUser.isEmailVerified) {
                 val uid = currentUser.uid
                 val now = System.currentTimeMillis()
-                // Only record if this is a new registration (no existing timestamp)
                 if (VerificationThrottle.getLastResendTime(context, uid) == 0L) {
                     VerificationThrottle.recordResend(context, uid, now)
                 }
             }
-            
+
             if(userRole == null){
                 navController.navigate(NavRoutes.RoleSelector.route) {
                     popUpTo(0)

@@ -70,7 +70,7 @@ class LocationMonitor(
     fun forceLocationUpdate() {
         updateLocationIfConnected()
     }
-    
+
     /**
      * Load and observe geofence updates
      */
@@ -95,7 +95,7 @@ class LocationMonitor(
             }
         }
     }
-    
+
     /**
      * Calculate distance between two points in meters
      */
@@ -110,7 +110,7 @@ class LocationMonitor(
         }
         return location1.distanceTo(location2) // Returns distance in meters
     }
-    
+
     /**
      * Check if location is outside all geofence zones
      */
@@ -118,23 +118,23 @@ class LocationMonitor(
         if (geofences.isEmpty()) {
             return false // If no geofences, consider child as "inside" (no notification needed)
         }
-        
+
         val location = LatLng(latitude, longitude)
-        
+
         for (geofence in geofences) {
             val geofenceLocation = geofence.position
             val distance = calculateDistanceInMeters(location, geofenceLocation)
-            
+
             // If child is within any geofence radius, they're not outside all zones
             if (distance <= geofence.radius) {
                 return false
             }
         }
-        
+
         // Child is outside all geofences
         return true
     }
-    
+
     /**
      * Check if location services (GPS or Network) are enabled
      */
@@ -143,7 +143,7 @@ class LocationMonitor(
         val isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
         return isGpsEnabled || isNetworkEnabled
     }
-    
+
     /**
      * Notify child that location services need to be enabled
      */
@@ -154,7 +154,7 @@ class LocationMonitor(
             return
         }
         lastLocationServicesNotificationTime = now
-        
+
         serviceScope.launch(Dispatchers.IO) {
             try {
                 NotificationsRepository.sendNotification(
@@ -176,7 +176,7 @@ class LocationMonitor(
             }
         }
     }
-    
+
     /**
      * Notify parent that child is outside all geofence zones
      */
@@ -187,14 +187,14 @@ class LocationMonitor(
             return
         }
         lastOutsideZoneNotificationTime = now
-        
+
         serviceScope.launch(Dispatchers.IO) {
             try {
                 if (user.parentLinkedId.isNullOrBlank()) {
                     Log.w("LocationMonitor", "Parent ID is null, cannot send outside zone notification")
                     return@launch
                 }
-                
+
                 NotificationsRepository.sendNotification(
                     targetId = user.parentLinkedId!!,
                     notification = NotificationModel(
@@ -218,7 +218,7 @@ class LocationMonitor(
     @SuppressLint("MissingPermission")
     private fun updateLocationIfConnected() {
         Log.d("LocationMonitor", "Updating location for ${user.getDecodedUid()}")
-        
+
         // Check if location services are enabled before attempting to get location
         if (!checkLocationServicesEnabled()) {
             Log.w("LocationMonitor", "Location services are disabled")
@@ -226,19 +226,21 @@ class LocationMonitor(
             return
         }
 
+        // FIX: Use HIGH_ACCURACY for realtime tracking and accurate updates
         fusedLocationClient.getCurrentLocation(
-            Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+            Priority.PRIORITY_HIGH_ACCURACY,
             null
         ).addOnSuccessListener { location: Location? ->
             location?.let {
-                if (location.accuracy > 100) { // Discard inaccurate locations
+                // Less aggressive filtering for accuracy if we want "best available"
+                if (location.accuracy > 200) {
                     Log.w("LocationMonitor", "Discarding inaccurate location with accuracy: ${location.accuracy}")
                     return@addOnSuccessListener
                 }
                 serviceScope.launch(Dispatchers.IO) {
                     Log.d("LocationMonitor", "Location: ${location.latitude}, ${location.longitude}")
                     val now = System.currentTimeMillis()
-                    
+
                     // Check if location is outside all geofences
                     val currentGeofences = geofences.toList() // Create a snapshot to avoid concurrency issues
                     if (currentGeofences.isNotEmpty()) {
@@ -252,7 +254,7 @@ class LocationMonitor(
                             notifyParentChildOutsideZone(location.latitude, location.longitude)
                         }
                     }
-                    
+
                     // Update location in parent's data
                     if (user.parentLinkedId != null) {
                         val result = GeofenceRepository.updateChildLocationInParentData(
@@ -272,7 +274,7 @@ class LocationMonitor(
                         } else {
                             Log.e("LocationMonitor", "Failed to update location: ${result.exceptionOrNull()}")
                         }
-                        
+
                         // Always append to history (fire and forget), even if the latest doc update fails
                         val historyResult = GeofenceRepository.appendChildLocationHistory(
                             parentId = user.parentLinkedId!!,

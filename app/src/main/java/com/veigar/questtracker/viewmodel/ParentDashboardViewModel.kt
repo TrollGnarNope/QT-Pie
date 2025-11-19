@@ -112,10 +112,10 @@ class ParentDashboardViewModel : ViewModel() {
         val completionPercentage: Int
             get() = if (total > 0) ((completed.toFloat() / total) * 100).toInt() else 0
     }
-    
+
     private val _childTaskProgress = MutableStateFlow<Map<String, ChildTaskProgress>>(emptyMap())
     val childTaskProgress: StateFlow<Map<String, ChildTaskProgress>> = _childTaskProgress.asStateFlow()
-    
+
     // Overall progress derived from child task progress
     val overallTaskProgress: StateFlow<ChildTaskProgress> = _childTaskProgress
         .map { progressMap ->
@@ -185,7 +185,7 @@ class ParentDashboardViewModel : ViewModel() {
             }
             .onEach { userModel ->
                 _isLoadingUser.value = false
-                
+
                 // Check if user was archived during active session: authenticated but profile is null
                 if (userModel == null) {
                     val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
@@ -201,7 +201,7 @@ class ParentDashboardViewModel : ViewModel() {
                         return@onEach
                     }
                 }
-                
+
                 _user.value = userModel
                 if (userModel != null) {
                     startObservingParentTasks(userModel.getDecodedUid())
@@ -224,8 +224,6 @@ class ParentDashboardViewModel : ViewModel() {
                 _isLoadingUser.value = false
                 _user.value = null
                 _errorFetchingUser.value = exception.message ?: "An unknown error occurred while fetching profile."
-                // Optionally, retry fetching after a delay
-                // Log.e("ParentDashboardVM", "Error observing user profile", exception)
             }
             .launchIn(viewModelScope)
     }
@@ -403,7 +401,7 @@ class ParentDashboardViewModel : ViewModel() {
                         newWeeklyTasks.isNotEmpty() ||
                         newOneTimeTasks.isNotEmpty()
                 Log.d("ParentDashboardVM", "Categorized tasks updated. Daily changed: $dailyChanged, Weekly: $weeklyChanged, OneTime: $oneTimeChanged. Counts: D=${newDailyTasks.size}, W=${newWeeklyTasks.size}, OT=${newOneTimeTasks.size}")
-                
+
                 // Update leaderboards when tasks change
                 updateLeaderboardsOnTaskChange()
             } else {
@@ -693,6 +691,7 @@ class ParentDashboardViewModel : ViewModel() {
                         notification = notification
                     )
                 }
+                // No snackbar needed as the UI handles state, but could add "Request sent" if desired
             }
         }
     }
@@ -919,10 +918,10 @@ class ParentDashboardViewModel : ViewModel() {
         _linkedChildren
             .onEach { children ->
                 Log.d("ParentDashboardVM", "observeAllChildrenTasks: ${children.size} linked children")
-                
+
                 // Get current child IDs
                 val currentChildIds = children.map { it.getDecodedUid() }.toSet()
-                
+
                 // Cancel observations for children that are no longer linked
                 childTaskObservationJobs.keys.filter { it !in currentChildIds }.forEach { removedChildId ->
                     Log.d("ParentDashboardVM", "Cancelling observation for removed child: $removedChildId")
@@ -933,7 +932,7 @@ class ParentDashboardViewModel : ViewModel() {
                         remove(removedChildId)
                     }
                 }
-                
+
                 if (children.isEmpty()) {
                     _allChildrenTasks.value = emptyMap()
                     return@onEach
@@ -947,11 +946,11 @@ class ParentDashboardViewModel : ViewModel() {
                         put(childId, true) // Mark as loading
                     }
                 }
-                
+
                 // Start observations for new children or update existing ones
                 children.forEach { child ->
                     val childId = child.getDecodedUid()
-                    
+
                     // Only start observation if not already observing this child
                     if (childId !in childTaskObservationJobs) {
                         Log.d("ParentDashboardVM", "Starting observation for child: $childId (${child.name})")
@@ -997,7 +996,7 @@ class ParentDashboardViewModel : ViewModel() {
                         }
                     }
                 }
-                
+
                 // Remove loading state for children that are no longer linked
                 _childTasksLoadingState.value = _childTasksLoadingState.value.toMutableMap().apply {
                     val currentChildIds = children.map { it.getDecodedUid() }.toSet()
@@ -1025,13 +1024,13 @@ class ParentDashboardViewModel : ViewModel() {
                 _childTaskProgress.value = emptyMap()
                 return@combine
             }
-            
+
             // Wait for parent tasks to finish loading
             if (isLoadingTasks && allParentTasks.isEmpty()) {
                 Log.d("ParentDashboardVM", "Waiting for parent tasks to load... (isLoading=$isLoadingTasks, tasks=${allParentTasks.size})")
                 return@combine
             }
-            
+
             // Wait for all children's task observations to complete
             // Check if any child is still loading their tasks
             // A child is considered "ready" if:
@@ -1043,16 +1042,16 @@ class ParentDashboardViewModel : ViewModel() {
                 val isExplicitlyLoading = childTasksLoadingMap[childId] == true
                 val hasData = allChildrenTasksMap.containsKey(childId)
                 val isMarkedAsLoaded = childTasksLoadingMap[childId] == false
-                
+
                 // Still loading if explicitly marked as loading, OR not in loading map and no data yet
                 isExplicitlyLoading || (!hasData && !isMarkedAsLoaded)
             }
-            
+
             if (childrenStillLoading.isNotEmpty()) {
                 Log.d("ParentDashboardVM", "Waiting for child tasks to load for: ${childrenStillLoading.map { it.name }} (loadingMap: $childTasksLoadingMap, hasData: ${childrenStillLoading.map { allChildrenTasksMap.containsKey(it.getDecodedUid()) }})")
                 return@combine
             }
-            
+
             // All data is ready - calculate progress
             Log.d("ParentDashboardVM", "All data ready - Calculating progress: children=${children.size}, parentTasks=${allParentTasks.size}, childTasksMap=${allChildrenTasksMap.size}")
 
@@ -1061,35 +1060,35 @@ class ParentDashboardViewModel : ViewModel() {
             // For each child, calculate their task statistics
             for (child in children) {
                 val childId = child.getDecodedUid()
-                
+
                 // Get parent tasks assigned to this child
                 val parentTasksForChild = allParentTasks.filter { task ->
                     isTaskAssignedToChild(task.assignedTo, childId)
                 }
-                
+
                 // Get child tasks (with updated statuses) for this child
                 val childTasksForChild = allChildrenTasksMap[childId] ?: emptyList()
-                
+
                 Log.d("ParentDashboardVM", "Progress calc for child $childId (${child.name}): ${parentTasksForChild.size} parent tasks, ${childTasksForChild.size} child tasks")
-                
+
                 // Log parent task IDs for debugging
                 parentTasksForChild.forEach { task ->
                     Log.d("ParentDashboardVM", "  Parent task: id=${task.taskId}, title='${task.title}', assignedTo=${task.assignedTo}, status=${task.completedStatus?.status}")
                 }
-                
+
                 // Log child task IDs for debugging
                 childTasksForChild.forEach { task ->
                     Log.d("ParentDashboardVM", "  Child task: id=${task.taskId}, title='${task.title}', status=${task.completedStatus?.status}")
                 }
-                
+
                 // Create a map of child tasks by taskId for quick lookup
                 val childTasksMap = childTasksForChild.associateBy { it.taskId }
-                
+
                 // Merge tasks: prefer child task data (has updated status) over parent task data
                 val mergedTasks = parentTasksForChild.map { parentTask ->
                     val childTask = childTasksMap[parentTask.taskId]
                     val merged = childTask ?: parentTask
-                    
+
                     if (childTask != null) {
                         Log.d("ParentDashboardVM", "✓ Task ${parentTask.taskId} ('${parentTask.title}') FOUND in child tasks: status=${merged.completedStatus?.status}")
                     } else {
@@ -1131,9 +1130,9 @@ class ParentDashboardViewModel : ViewModel() {
                     }
                     isOngoing
                 }
-                
+
                 Log.d("ParentDashboardVM", "Child $childId FINAL progress: completed=$completed, awaitingApproval=$awaitingApproval, declined=$declined, missed=$missed, ongoing=$ongoing, total=${mergedTasks.size}")
-                
+
                 // Log detailed breakdown for debugging
                 mergedTasks.forEach { task ->
                     val status = task.completedStatus?.status
@@ -1285,7 +1284,7 @@ class ParentDashboardViewModel : ViewModel() {
                 if (currentUser != null && currentUser.role == "parent") {
                     Log.d("ParentDashboardVM", "Updating leaderboards automatically for parent: ${currentUser.getDecodedUid()}")
                     LeaderboardUpdateService.updateLeaderboardForParent(currentUser, viewModelScope)
-                    
+
                     // Set up periodic leaderboard updates every 30 minutes
                     setupPeriodicLeaderboardUpdates()
                 } else {

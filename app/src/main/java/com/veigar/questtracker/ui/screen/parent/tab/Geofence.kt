@@ -121,7 +121,7 @@ fun GeofenceTab(
         }
     }
 
-    // Handle Snackbar messages (e.g., by showing a Toast if no higher-level Scaffold)
+    // Handle Snackbar messages
     LaunchedEffect(uiState.snackbarMessage) {
         uiState.snackbarMessage?.let { message ->
             Toast.makeText(currentContext, message, Toast.LENGTH_LONG).show()
@@ -130,23 +130,53 @@ fun GeofenceTab(
     }
 
     Box(
-        modifier = Modifier.fillMaxSize() // This Box is now the root of the tab's UI
+        modifier = Modifier.fillMaxSize()
     ) {
-        when {
-            // Case 1: System permissions not granted
-            !locationPermissionsState.allPermissionsGranted -> {
-                PermissionRequestUI(
-                    onGrantPermissionsClick = {
-                        locationPermissionsState.launchMultiplePermissionRequest()
+        // FIX: UI Logic Refactored to prevent unmounting the Map (which causes crashes)
+        // Instead of switching views completely, we layer them.
+
+        // 1. Base Layer: Permissions or Map
+        if (!locationPermissionsState.allPermissionsGranted) {
+            PermissionRequestUI(
+                onGrantPermissionsClick = {
+                    locationPermissionsState.launchMultiplePermissionRequest()
+                },
+                shouldShowRationale = locationPermissionsState.shouldShowRationale
+            )
+        } else {
+            // Permissions granted
+            if (uiState.showMap && uiState.deviceLocation != null) {
+                // Show Map
+                MapContainer(
+                    deviceLocation = uiState.deviceLocation!!,
+                    geofences = uiState.geofences,
+                    selectedGeofenceId = uiState.selectedGeofenceId,
+                    onGeofenceClick = { geofenceId ->
+                        geofenceViewModel.onGeofenceMarkerClick(geofenceId)
                     },
-                    // You might want to pass locationPermissionsState.shouldShowRationale here
-                    // to customize the text if rationale is needed.
-                    shouldShowRationale = locationPermissionsState.shouldShowRationale
+                    onMapClick = {
+                        geofenceViewModel.deselectGeofence()
+                    },
+                    onPrepareToAddGeofence = { currentMapCenter ->
+                        geofenceViewModel.prepareToAddGeofenceAt(currentMapCenter)
+                    },
+                    onEditGeofenceClick = {
+                        geofenceViewModel.prepareToEditSelectedGeofence()
+                    },
+                    onGeofenceMoved = { geofenceId, newPosition ->
+                        geofenceViewModel.updateGeofencePosition(geofenceId, newPosition)
+                    },
+                    onMapLoaded = { geofenceViewModel.onMapLoaded() },
+                    isMapInitializationComplete = uiState.mapInitializationComplete,
+                    childLocations = uiState.childLocations,
+                    onRefreshClick = {
+                        geofenceViewModel.fetchDeviceLocation(fusedLocationClient, application)
+                        geofenceViewModel.requestLocationUpdate()
+                    },
+                    focusedChildId = focusedChildId
                 )
-            }
-            // Case 2: Permissions considered granted by ViewModel, but map not ready to be shown
-            // (either location not fetched or user interaction needed)
-            uiState.permissionGranted && !uiState.showMap -> {
+            } else {
+                // Map not ready yet (getting location), show placeholder
                 GetLocationUI(
                     isLoading = uiState.isFetchingLocation,
                     onGetLocationClick = {
@@ -157,65 +187,26 @@ fun GeofenceTab(
                     }
                 )
             }
-            // Case 3: Permissions granted and ready to show map
-            uiState.permissionGranted && uiState.deviceLocation != null -> {
-                MapContainer(
-                    deviceLocation = uiState.deviceLocation!!,
-                    geofences = uiState.geofences,
-                    selectedGeofenceId = uiState.selectedGeofenceId, // Pass selected ID
-                    onGeofenceClick = { geofenceId -> // New callback for marker click
-                        geofenceViewModel.onGeofenceMarkerClick(geofenceId)
-                    },
-                    onMapClick = { // New callback for map click to deselect
-                        geofenceViewModel.deselectGeofence()
-                    },
-                    onPrepareToAddGeofence = { currentMapCenter ->
-                        geofenceViewModel.prepareToAddGeofenceAt(currentMapCenter)
-                    },
-                    onEditGeofenceClick = { // New callback for edit button
-                        geofenceViewModel.prepareToEditSelectedGeofence()
-                    },
-                    onGeofenceMoved = { geofenceId, newPosition -> // New Callback
-                        geofenceViewModel.updateGeofencePosition(geofenceId, newPosition)
-                    },
-                    onMapLoaded = { geofenceViewModel.onMapLoaded() },
-                    isMapInitializationComplete = uiState.mapInitializationComplete,
-                    childLocations = uiState.childLocations,
-                    onRefreshClick = {
-                        geofenceViewModel.requestLocationUpdate()
-                    },
-                    focusedChildId = focusedChildId
-                )
-            }
-            // Fallback / Initial state if permissions are granted (by ViewModel)
-            // but still figuring things out (e.g. location not yet fetched or currently fetching)
-            uiState.permissionGranted -> {
-                GetLocationUI(
-                    isLoading = uiState.isFetchingLocation,
-                    onGetLocationClick = {
-                        geofenceViewModel.fetchDeviceLocation(fusedLocationClient = fusedLocationClient,
-                            context = application)
-                    }
-                )
-            }
-            // Default fallback if none of the above specific states match (e.g., permissions not granted by ViewModel state)
-            else -> {
-                PermissionRequestUI(
-                    onGrantPermissionsClick = {
-                        locationPermissionsState.launchMultiplePermissionRequest()
-                    },
-                    shouldShowRationale = locationPermissionsState.shouldShowRationale
-                )
+        }
+
+        // 2. Overlay Layer: Loading Indicator (if refreshing while map is already shown)
+        if (uiState.showMap && uiState.isFetchingLocation) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color.White)
             }
         }
     }
+
     // --- Dialogs ---
     if (uiState.showAddGeofenceDialog) {
         AddOrEditGeofenceDialog(
             dialogTitle = "Add Geofence Details",
             confirmButtonText = "Add",
-            initialName = "", // Empty for new geofence
-            initialRadius = "", // Empty for new geofence
+            initialName = "",
+            initialRadius = "",
             onDismissRequest = { geofenceViewModel.dismissAddGeofenceDialog() },
             onConfirm = { name, radius ->
                 geofenceViewModel.saveNewGeofence(name, radius)
@@ -264,6 +255,7 @@ fun MapContainer(
         position = CameraPosition.fromLatLngZoom(deviceLocation, 2f)
     }
 
+    // Re-center camera when deviceLocation updates (e.g., after refresh)
     LaunchedEffect(deviceLocation, isMapInitializationComplete) {
         if (isMapInitializationComplete) {
             cameraPositionState.animate(
@@ -486,7 +478,6 @@ fun CustomMarker(
             contentAlignment = Alignment.Center
         ) {
             if (childLocation.avatarUrl.isNotEmpty()) {
-                Log.d("CustomMarker", "Displaying avatar for ${childLocation.avatarUrl}")
                 Image(
                     painter = painter,
                     contentDescription = "Profile Image",
@@ -525,7 +516,6 @@ fun CustomMarker(
         }
     }
 }
-
 
 @Composable
 fun AddOrEditGeofenceDialog(
@@ -596,7 +586,7 @@ fun AddOrEditGeofenceDialog(
 @Composable
 fun PermissionRequestUI(
     onGrantPermissionsClick: () -> Unit,
-    shouldShowRationale: Boolean // Added to customize message
+    shouldShowRationale: Boolean
 ) {
     Column(
         modifier = Modifier

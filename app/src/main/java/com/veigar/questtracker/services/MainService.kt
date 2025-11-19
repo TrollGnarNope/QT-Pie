@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -54,7 +55,7 @@ class MainService : Service(), NotificationDisplayer {
         private const val DAILY_TASKS_NOTIFICATION_ID = 2
         private const val NOTIFICATION_QUEUE_DELAY_MS = 2000L // 2 seconds between notifications
     }
-    
+
     // Notification queue to prevent stacking
     private val notificationQueue = mutableListOf<NotificationModel>()
     private var isShowingNotification = false
@@ -92,7 +93,18 @@ class MainService : Service(), NotificationDisplayer {
         } else {
             registerReceiver(taskUpdateReceiver, intentFilter)
         }
-        startForeground(ONGOING_NOTIFICATION_ID, createOngoingNotification("Initializing..."))
+
+        // FIX: Provide foreground service type for Android 14+ compliance
+        // We combine DATA_SYNC and LOCATION to match the manifest and support location tracking
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                ONGOING_NOTIFICATION_ID,
+                createOngoingNotification("Initializing..."),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            )
+        } else {
+            startForeground(ONGOING_NOTIFICATION_ID, createOngoingNotification("Initializing..."))
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -353,7 +365,7 @@ class MainService : Service(), NotificationDisplayer {
             }
         }
     }
-    
+
     /**
      * Processes the notification queue one at a time with delays to prevent stacking
      * Urgent notifications are prioritized and shown first
@@ -367,8 +379,8 @@ class MainService : Service(), NotificationDisplayer {
                         // Prioritize urgent notifications (task changes, rewards, system)
                         val urgentIndex = notificationQueue.indexOfFirst { notif ->
                             notif.category == NotificationCategory.TASK_CHANGE ||
-                            notif.category == NotificationCategory.REWARD ||
-                            notif.category == NotificationCategory.SYSTEM
+                                    notif.category == NotificationCategory.REWARD ||
+                                    notif.category == NotificationCategory.SYSTEM
                         }
                         if (urgentIndex >= 0) {
                             notificationQueue.removeAt(urgentIndex)
@@ -379,13 +391,13 @@ class MainService : Service(), NotificationDisplayer {
                         null
                     }
                 }
-                
+
                 if (notification != null) {
                     displayNotification(notification)
                     // Shorter delay for urgent notifications to feel more immediate
-                    val isUrgent = notification.category == NotificationCategory.TASK_CHANGE || 
-                                  notification.category == NotificationCategory.REWARD ||
-                                  notification.category == NotificationCategory.SYSTEM
+                    val isUrgent = notification.category == NotificationCategory.TASK_CHANGE ||
+                            notification.category == NotificationCategory.REWARD ||
+                            notification.category == NotificationCategory.SYSTEM
                     delay(if (isUrgent) NOTIFICATION_QUEUE_DELAY_MS / 2 else NOTIFICATION_QUEUE_DELAY_MS)
                     isShowingNotification = false
                 } else {
@@ -394,7 +406,7 @@ class MainService : Service(), NotificationDisplayer {
             }
         }
     }
-    
+
     /**
      * Actually displays the notification with appropriate priority and urgency
      */
@@ -421,10 +433,10 @@ class MainService : Service(), NotificationDisplayer {
         )
 
         // Determine priority and channel based on category
-        val isUrgent = notification.category == NotificationCategory.TASK_CHANGE || 
-                      notification.category == NotificationCategory.REWARD ||
-                      notification.category == NotificationCategory.SYSTEM
-        
+        val isUrgent = notification.category == NotificationCategory.TASK_CHANGE ||
+                notification.category == NotificationCategory.REWARD ||
+                notification.category == NotificationCategory.SYSTEM
+
         val channelId = if (isUrgent) URGENT_NOTIFICATION_CHANNEL_ID else NOTIFICATION_CHANNEL_ID
         val priority = if (isUrgent) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT
 
@@ -443,7 +455,7 @@ class MainService : Service(), NotificationDisplayer {
         // Use a combination of notificationId hash and timestamp for unique IDs
         // This ensures each notification gets a unique system ID even if they arrive simultaneously
         val uniqueId = (notification.notificationId.hashCode() xor System.currentTimeMillis().toInt()) and 0x7FFFFFFF
-        
+
         notificationManager.notify(uniqueId, notificationBuilder.build())
         Log.d(TAG, "Displayed system notification: ${notification.title} (Urgent: $isUrgent, ID: $uniqueId)")
     }
@@ -532,7 +544,7 @@ class MainService : Service(), NotificationDisplayer {
             manager?.createNotificationChannel(serviceChannel)
         }
     }
-    
+
     private fun createUrgentNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val urgentChannel = NotificationChannel(
