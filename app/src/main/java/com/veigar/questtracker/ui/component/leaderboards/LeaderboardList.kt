@@ -6,6 +6,12 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import com.veigar.questtracker.ui.theme.DailyQuestGradientEnd
+import com.veigar.questtracker.ui.theme.DailyQuestGradientStart
+import com.veigar.questtracker.ui.theme.OneTimeQuestGradientEnd
+import com.veigar.questtracker.ui.theme.OneTimeQuestGradientStart
+import com.veigar.questtracker.ui.theme.WeeklyQuestGradientEnd
+import com.veigar.questtracker.ui.theme.WeeklyQuestGradientStart
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState

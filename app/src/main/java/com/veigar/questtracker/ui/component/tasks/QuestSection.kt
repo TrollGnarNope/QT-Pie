@@ -28,16 +28,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.veigar.questtracker.model.TaskModel
+import com.veigar.questtracker.ui.theme.DailyQuestGradientEnd
+import com.veigar.questtracker.ui.theme.DailyQuestGradientStart
 
 @Composable
-fun QuestsSection(
-    taskList: List<TaskModel>,
+fun QuestSection(
     title: String,
+    tasks: List<TaskModel>,
     emptyDescription: String = "No Quests Assigned",
-    gradientStartColor: Color,
-    gradientEndColor: Color,
+    gradientStartColor: Color = DailyQuestGradientStart,
+    gradientEndColor: Color = DailyQuestGradientEnd,
     modifier: Modifier = Modifier,
-    onTaskClicked: (TaskModel) -> Unit = {}
+    onTaskClick: (TaskModel) -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -52,12 +54,11 @@ fun QuestsSection(
             )
             .padding(16.dp)
     ) {
-        // 1. The Title Text (always visible at the top)
         Text(
             text = title,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 12.dp), // Pushes content below it down
+            modifier = Modifier.padding(bottom = 12.dp),
             style = TextStyle(
                 color = Color.White,
                 shadow = Shadow(
@@ -69,14 +70,13 @@ fun QuestsSection(
         )
 
         AnimatedContent(
-            targetState = taskList.isEmpty(),
+            targetState = tasks.isEmpty(),
             transitionSpec = {
                 (fadeIn(animationSpec = tween(300)) + slideInVertically(animationSpec = tween(300)) { -it / 2 }) togetherWith
                         (fadeOut(animationSpec = tween(300)) + slideOutVertically(animationSpec = tween(300)) { it / 2 })
             }, label = "QuestsSectionContentAnimation"
         ) { isEmpty ->
             if (isEmpty) {
-                // "No Quests Assigned" message
                 Text(
                     text = emptyDescription,
                     fontSize = 18.sp,
@@ -91,23 +91,20 @@ fun QuestsSection(
                     )
                 )
             } else {
-                // The container for your QuestCards (Option A - AnimatedContent for list)
-                // This ensures animations for adding/removing individual items
                 AnimatedContent(
-                    targetState = taskList,
+                    targetState = tasks,
                     transitionSpec = {
                         fadeIn(animationSpec = tween(durationMillis = 300)) + slideInVertically(animationSpec = tween(durationMillis = 300)) togetherWith
                                 fadeOut(animationSpec = tween(durationMillis = 300)) + slideOutVertically(animationSpec = tween(durationMillis = 300))
                     }, label = "QuestCardsListAnimation"
                 ) { currentTaskList ->
-                    // This inner Column will hold the QuestCards
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         currentTaskList.forEach { task ->
                             key(task.taskId) {
                                 QuestCard(
                                     task,
                                     modifier = Modifier
-                                        .clickable { onTaskClicked(task) }
+                                        .clickable { onTaskClick(task) }
                                         .animateContentSize()
                                 )
                             }

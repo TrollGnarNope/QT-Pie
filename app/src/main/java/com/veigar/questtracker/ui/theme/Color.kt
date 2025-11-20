@@ -11,10 +11,27 @@ val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
 
 val CoralBlue = Color(0xFF64B5F6)
+val CoralBlueLight = Color(0xFFBBDEFB)
 val CoralBlueDark = Color(0xFF1976D2)
+val CoralBlueDarkest = Color(0xFF0D47A1)
+
 val TextPrimary = Color(0xFF212121)
+val TextSecondary = Color(0xFF757575)
+
+val ProfessionalGray = Color(0xFFECEFF1)
 val ProfessionalGrayDark = Color(0xFF37474F)
+val ProfessionalGrayLight = Color(0xFFCFD8DC)
+val ProfessionalGrayText = Color(0xFF263238)
+val ProfessionalGrayTextSecondary = Color(0xFF546E7A)
+val ProfessionalGraySurface = Color(0xFFFFFFFF)
+val ProfessionalGrayBorder = Color(0xFFB0BEC5)
+
 val BackgroundBeige = Color(0xFFF5F5F5)
+val Background = Color(0xFFFAFAFA)
+val Surface = Color(0xFFFFFFFF)
+val ErrorRed = Color(0xFFB00020)
+
+val yellow = Color(0xFFFFD54F)
 
 // Gradients
 val DailyQuestGradientStart = Color(0xFF4FC3F7)
@@ -25,3 +42,6 @@ val WeeklyQuestGradientEnd = Color(0xFF689F38)
 
 val OneTimeQuestGradientStart = Color(0xFFFFB74D)
 val OneTimeQuestGradientEnd = Color(0xFFF57C00)
+
+val SkyBlueGradientLeft = Color(0xFF4FC3F7)
+val SkyBlueGradientRight = Color(0xFF0288D1)

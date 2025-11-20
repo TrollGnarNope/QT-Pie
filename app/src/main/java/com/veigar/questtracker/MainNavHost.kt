@@ -11,7 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.veigar.questtracker.ui.screen.auth.AuthScreen
-import com.veigar.questtracker.ui.screen.chats.ChatsScreen
+import com.veigar.questtracker.ui.screen.chats.ChatScreen
 import com.veigar.questtracker.ui.screen.child.AssignedQuizzesScreen
 import com.veigar.questtracker.ui.screen.child.ChildDashboardScreen
 import com.veigar.questtracker.ui.screen.child.LinkParentScreen
@@ -29,10 +29,10 @@ import com.veigar.questtracker.ui.screen.parent.QuizAttemptReviewScreen
 import com.veigar.questtracker.ui.screen.parent.QuizzesScreen
 import com.veigar.questtracker.ui.screen.parent.RewardsScreen
 import com.veigar.questtracker.ui.screen.profile.ProfileEditScreen
-import com.veigar.questtracker.ui.screen.profile.ProfileSetUpScreen
+import com.veigar.questtracker.ui.screen.profile.ProfileSetupScreen
 import com.veigar.questtracker.ui.screen.role.ParentSubRoleScreen
 import com.veigar.questtracker.ui.screen.role.RoleSelectorScreen
-import com.veigar.questtracker.ui.screen.splash.Splash
+import com.veigar.questtracker.ui.screen.splash.SplashScreen
 import com.veigar.questtracker.viewmodel.ParentDashboardViewModel
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -44,7 +44,7 @@ fun MainNavHost(
 ) {
     NavHost(navController = navController, startDestination = startDestination) {
         composable(NavRoutes.Splash.route) {
-            Splash(navController = navController)
+            SplashScreen(navController = navController)
         }
         composable(NavRoutes.RoleSelector.route) {
             RoleSelectorScreen(navController = navController)
@@ -56,10 +56,11 @@ fun MainNavHost(
             AuthScreen(navController = navController)
         }
         composable(NavRoutes.ProfileSetup.route) {
-            ProfileSetUpScreen(navController = navController)
+            ProfileSetupScreen(navController = navController)
         }
         composable(NavRoutes.ParentDashboard.route) {
-            ParentDashboardScreen(navController = navController)
+            val viewModel: ParentDashboardViewModel = viewModel()
+            ParentDashboardScreen(navController = navController, viewModel = viewModel)
         }
         composable(NavRoutes.ChildDashboard.route) {
             ChildDashboardScreen(navController = navController)
@@ -79,9 +80,7 @@ fun MainNavHost(
                 navArgument("requestId") { defaultValue = "" }
             )
         ) { backStackEntry ->
-            // Get ParentDashboardViewModel to share state if needed, or let screen create its own
             val viewModel: ParentDashboardViewModel = viewModel()
-
             CreateTaskScreen(
                 navController = navController,
                 viewModel = viewModel
@@ -91,7 +90,7 @@ fun MainNavHost(
             CreateQuizScreen(navController = navController)
         }
         composable(NavRoutes.Chats.route) {
-            ChatsScreen(navController = navController)
+            ChatScreen(navController = navController)
         }
         composable(NavRoutes.ProfileEdit.route) {
             ProfileEditScreen(navController = navController)
@@ -108,7 +107,13 @@ fun MainNavHost(
         composable(NavRoutes.Quizzes.route) {
             QuizzesScreen(navController = navController)
         }
-        composable(NavRoutes.LocationHistory.route) {
+        composable(
+            route = NavRoutes.LocationHistory.route,
+            arguments = listOf(
+                navArgument("parentId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType }
+            )
+        ) {
             LocationHistoryScreen(navController = navController)
         }
         composable(NavRoutes.CompletedTaskHistory.route) {
@@ -116,10 +121,14 @@ fun MainNavHost(
         }
         composable(
             route = NavRoutes.QuizAttemptReview.route,
-            arguments = listOf(navArgument("attemptId") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("quizId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType }
+            )
         ) { backStackEntry ->
-            val attemptId = backStackEntry.arguments?.getString("attemptId") ?: return@composable
-            QuizAttemptReviewScreen(navController = navController, attemptId = attemptId)
+            val quizId = backStackEntry.arguments?.getString("quizId") ?: return@composable
+            val childId = backStackEntry.arguments?.getString("childId") ?: return@composable
+            QuizAttemptReviewScreen(navController = navController, quizId = quizId, childId = childId)
         }
         composable(
             route = NavRoutes.TakeQuiz.route,
@@ -133,6 +142,15 @@ fun MainNavHost(
         }
         composable(NavRoutes.Leaderboards.route) {
             LeaderboardsScreen(navController = navController)
+        }
+        // Fallback or specific routes if needed
+        composable(
+            route = NavRoutes.CompletedTasks.route,
+            arguments = listOf(navArgument("childId") { type = NavType.StringType })
+        ) {
+            // Reuse CompletedTaskHistoryScreen or create a new one.
+            // Assuming reusing logic or it handles its own args if using ViewModel.
+            CompletedTaskHistoryScreen(navController = navController)
         }
     }
 }

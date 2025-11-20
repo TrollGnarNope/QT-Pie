@@ -13,7 +13,6 @@ sealed class NavRoutes(val route: String) {
     object LinkChild : NavRoutes("link_child")
     object LinkParent : NavRoutes("link_parent")
 
-    // Updated to accept parameters for pre-filling from a request
     object CreateTask : NavRoutes("create_task?title={title}&desc={desc}&childId={childId}&requestId={requestId}") {
         fun createRoute(title: String = "", desc: String = "", childId: String = "", requestId: String = "") =
             "create_task?title=${Uri.encode(title)}&desc=${Uri.encode(desc)}&childId=$childId&requestId=$requestId"
@@ -26,11 +25,14 @@ sealed class NavRoutes(val route: String) {
     object HelpCenter : NavRoutes("help_center")
     object Documentation : NavRoutes("documentation")
     object Quizzes : NavRoutes("quizzes")
-    object LocationHistory : NavRoutes("location_history")
     object CompletedTaskHistory : NavRoutes("completed_task_history")
 
-    object QuizAttemptReview : NavRoutes("quiz_attempt_review/{attemptId}") {
-        fun createRoute(attemptId: String) = "quiz_attempt_review/$attemptId"
+    object LocationHistory : NavRoutes("location_history/{parentId}/{childId}") {
+        fun createRoute(parentId: String, childId: String) = "location_history/$parentId/$childId"
+    }
+
+    object QuizAttemptReview : NavRoutes("quiz_attempt_review/{quizId}/{childId}") {
+        fun createRoute(quizId: String, childId: String) = "quiz_attempt_review/$quizId/$childId"
     }
 
     object TakeQuiz : NavRoutes("take_quiz/{quizId}") {
@@ -40,10 +42,11 @@ sealed class NavRoutes(val route: String) {
     object AssignedQuizzes : NavRoutes("assigned_quizzes")
     object Leaderboards : NavRoutes("leaderboards")
 
-    // Adding potentially missing routes that were referenced
     object EditQuiz : NavRoutes("edit_quiz/{quizId}") {
         fun createRoute(quizId: String) = "edit_quiz/$quizId"
     }
 
-    object CompletedTasks : NavRoutes("completed_tasks")
+    object CompletedTasks : NavRoutes("completed_tasks/{childId}") {
+        fun createRoute(childId: String) = "completed_tasks/$childId"
+    }
 }
