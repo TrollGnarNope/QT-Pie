@@ -44,18 +44,19 @@ import com.google.firebase.Timestamp
 import com.veigar.questtracker.model.Question
 import com.veigar.questtracker.model.UserModel
 import com.veigar.questtracker.ui.component.createtask.LabeledTextField // Import LabeledTextField
-import com.veigar.questtracker.ui.screen.parent.tab.ChildChip // Added import
+import com.veigar.questtracker.ui.component.ChildChip // Corrected import
 import com.veigar.questtracker.ui.theme.CoralBlueDark
 import com.veigar.questtracker.ui.theme.CoralBlueDarkest
 import com.veigar.questtracker.ui.theme.ProfessionalGray
 import com.veigar.questtracker.ui.theme.ProfessionalGrayDark
 import com.veigar.questtracker.ui.theme.ProfessionalGrayLight
-import com.veigar.questtracker.ui.theme.ProfessionalGrayText 
-import com.veigar.questtracker.ui.theme.yellow 
+import com.veigar.questtracker.ui.theme.ProfessionalGrayText
+import com.veigar.questtracker.ui.theme.yellow
 import com.veigar.questtracker.viewmodel.CreateQuizViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
+// ... (Rest of file same)
 // Constants for question types - Consider moving to a shared file
 const val QUESTION_TYPE_SINGLE_CHOICE_CQS = "SINGLE_CHOICE"
 const val QUESTION_TYPE_MULTIPLE_CHOICE_CQS = "MULTIPLE_CHOICE"
@@ -88,7 +89,7 @@ fun CreateQuizScreen(
     val isSaving by createQuizViewModel.isSaving.collectAsStateWithLifecycle()
 
     var showQuestionEditorDialog by remember { mutableStateOf(false) }
-    var editingQuestion by remember { mutableStateOf<Question?>(null) } 
+    var editingQuestion by remember { mutableStateOf<Question?>(null) }
 
     LaunchedEffect(quizId) {
         if (quizId != null) {
@@ -100,7 +101,7 @@ fun CreateQuizScreen(
             }
         } else {
             Log.d("CreateQuizScreen", "LaunchedEffect: Creating new quiz or viewModel was reset.")
-            if (!createQuizViewModel.isEditing.value) { 
+            if (!createQuizViewModel.isEditing.value) {
                 createQuizViewModel.resetToCreateMode()
             }
         }
@@ -136,13 +137,13 @@ fun CreateQuizScreen(
 
     if (showQuestionEditorDialog) {
         QuestionEditorDialog(
-            initialQuestion = editingQuestion, 
+            initialQuestion = editingQuestion,
             onDismiss = { showQuestionEditorDialog = false },
             onSave = {
-                questionToSave ->
-                if (editingQuestion == null) { 
+                    questionToSave ->
+                if (editingQuestion == null) {
                     createQuizViewModel.addQuestion(questionToSave)
-                } else { 
+                } else {
                     createQuizViewModel.updateQuestion(questionToSave)
                 }
                 showQuestionEditorDialog = false
@@ -154,7 +155,7 @@ fun CreateQuizScreen(
         topBar = {
             TopAppBar(
                 title = { Text(
-                    if (isEditingQuiz) "Edit Quiz" else "Create New Quiz", 
+                    if (isEditingQuiz) "Edit Quiz" else "Create New Quiz",
                     color = ProfessionalGrayText
                 ) },
                 navigationIcon = {
@@ -172,23 +173,23 @@ fun CreateQuizScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = {
-                editingQuestion = null 
+                editingQuestion = null
                 showQuestionEditorDialog = true
             },
-                containerColor = yellow, 
-                contentColor = Color.White 
+                containerColor = yellow,
+                contentColor = Color.White
             ) {
                 Icon(Icons.Filled.Add, contentDescription = "Add Question")
             }
         },
-        containerColor = ProfessionalGrayDark 
+        containerColor = ProfessionalGrayDark
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp) 
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
                 Card(
@@ -196,11 +197,11 @@ fun CreateQuizScreen(
                         .fillMaxWidth()
                         .padding(top = 8.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    colors = CardDefaults.cardColors(containerColor = ProfessionalGray) 
+                    colors = CardDefaults.cardColors(containerColor = ProfessionalGray)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "Quiz Details", 
+                            "Quiz Details",
                             style = MaterialTheme.typography.titleLarge,
                             color = ProfessionalGrayText,
                             modifier = Modifier.padding(bottom = 12.dp)
@@ -257,8 +258,8 @@ fun CreateQuizScreen(
                         Spacer(Modifier.height(16.dp))
 
                         Text(
-                            "Schedule (Optional)", 
-                            style = MaterialTheme.typography.titleMedium, 
+                            "Schedule (Optional)",
+                            style = MaterialTheme.typography.titleMedium,
                             color = ProfessionalGrayText,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
@@ -266,7 +267,7 @@ fun CreateQuizScreen(
                             LabeledTextField(
                                 value = scheduleStartTime?.toDate()?.let { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(it) } ?: "Not set",
                                 onValueChange = {},
-                                label = "Start Time", 
+                                label = "Start Time",
                                 modifier = Modifier.weight(1f),
                                 singleLine = true
                             )
@@ -278,7 +279,7 @@ fun CreateQuizScreen(
                                     contentColor = Color.White
                                 )
                             ) {
-                                Text("Set") 
+                                Text("Set")
                             }
                         }
                         Spacer(Modifier.height(12.dp))
@@ -286,7 +287,7 @@ fun CreateQuizScreen(
                             LabeledTextField(
                                 value = scheduleEndTime?.toDate()?.let { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(it) } ?: "Not set",
                                 onValueChange = {},
-                                label = "End Time", 
+                                label = "End Time",
                                 modifier = Modifier.weight(1f),
                                 singleLine = true
                             )
@@ -298,16 +299,16 @@ fun CreateQuizScreen(
                                     contentColor = Color.White
                                 )
                             ) {
-                                Text("Set") 
+                                Text("Set")
                             }
                         }
                     }
                 }
                 Text(
-                    "Questions (${questions.size})", 
-                    style = MaterialTheme.typography.titleLarge, 
+                    "Questions (${questions.size})",
+                    style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
-                    color = ProfessionalGrayText 
+                    color = ProfessionalGrayText
                 )
             }
 
@@ -317,7 +318,7 @@ fun CreateQuizScreen(
                         "No questions added yet. Click the + button to add questions.",
                         modifier = Modifier.padding(vertical = 16.dp, horizontal = 8.dp),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = ProfessionalGrayText.copy(alpha = 0.75f) 
+                        color = ProfessionalGrayText.copy(alpha = 0.75f)
                     )
                 }
             }
@@ -334,7 +335,7 @@ fun CreateQuizScreen(
             }
 
             item {
-                Spacer(Modifier.height(16.dp)) 
+                Spacer(Modifier.height(16.dp))
                 Button(
                     onClick = {
                         createQuizViewModel.save { success, errorMsg ->
@@ -384,17 +385,17 @@ fun CreateQuizScreen(
                         }
                     } else {
                         Text(
-                            if (isEditingQuiz) "Update Quiz" else "Save Quiz", 
+                            if (isEditingQuiz) "Update Quiz" else "Save Quiz",
                             fontSize = 16.sp
                         )
                     }
                 }
-                Spacer(Modifier.height(80.dp)) 
+                Spacer(Modifier.height(80.dp))
             }
         }
     }
 }
-
+// ... (QuestionItem and QuestionEditorDialog remain unchanged)
 @Composable
 fun QuestionItem(
     question: Question,
@@ -412,35 +413,35 @@ fun QuestionItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp, horizontal = 12.dp), 
+                .padding(vertical = 12.dp, horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    question.text, 
-                    style = MaterialTheme.typography.titleMedium, 
+                    question.text,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Normal,
-                    color = ProfessionalGrayText 
+                    color = ProfessionalGrayText
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Type: ${question.type.toDisplayableType_CQS()}, Points: ${question.points}", 
-                    style = MaterialTheme.typography.bodySmall, 
-                    color = ProfessionalGrayText.copy(alpha = 0.7f) 
+                    "Type: ${question.type.toDisplayableType_CQS()}, Points: ${question.points}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ProfessionalGrayText.copy(alpha = 0.7f)
                 )
                 if (question.options.isNotEmpty() && question.type != QUESTION_TYPE_TEXT_INPUT_CQS) {
-                     Text(
-                        "Options: ${question.options.joinToString(limit = 3, truncated = "...")}", 
-                        style = MaterialTheme.typography.bodySmall, 
-                        color = ProfessionalGrayText.copy(alpha = 0.7f) 
+                    Text(
+                        "Options: ${question.options.joinToString(limit = 3, truncated = "...")}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ProfessionalGrayText.copy(alpha = 0.7f)
                     )
                 }
                 question.correctAnswer?.let {
                     if (it.isNotEmpty()) {
                         Text(
-                            "Correct: ${it.joinToString(limit = 2, truncated = "...")}", 
-                            style = MaterialTheme.typography.bodySmall, 
-                            color = ProfessionalGrayText.copy(alpha = 0.9f) 
+                            "Correct: ${it.joinToString(limit = 2, truncated = "...")}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ProfessionalGrayText.copy(alpha = 0.9f)
                         )
                     }
                 }
@@ -455,7 +456,7 @@ fun QuestionItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuestionEditorDialog(
-    initialQuestion: Question?, 
+    initialQuestion: Question?,
     onDismiss: () -> Unit,
     onSave: (Question) -> Unit
 ) {
@@ -479,7 +480,7 @@ fun QuestionEditorDialog(
             textInputAnswerValue = TextFieldValue(initialQuestion.correctAnswer?.firstOrNull() ?: "")
         }
     }
-    
+
     // Clear validation errors when user makes changes
     LaunchedEffect(text, type, points, selectedSingleAnswer, correctAnswersMulti, textInputAnswerValue.text, options) {
         if (validationErrors.isNotEmpty()) {
@@ -498,7 +499,7 @@ fun QuestionEditorDialog(
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(bottom = 20.dp).align(Alignment.CenterHorizontally)
                 )
-                Box(modifier = Modifier.heightIn(max = 500.dp)) { 
+                Box(modifier = Modifier.heightIn(max = 500.dp)) {
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())){
                         OutlinedTextField(
                             value = text,
@@ -622,7 +623,7 @@ fun QuestionEditorDialog(
                                                 )
                                             } else {
                                                 Checkbox(
-                                                    checked = correctAnswersMulti.contains(option), 
+                                                    checked = correctAnswersMulti.contains(option),
                                                     onCheckedChange = { isChecked ->
                                                         if (isChecked) {
                                                             if (!correctAnswersMulti.contains(option)) correctAnswersMulti.add(option)
@@ -648,7 +649,7 @@ fun QuestionEditorDialog(
                             }
                         }
                         Spacer(Modifier.height(16.dp))
-                        
+
                         // Display validation errors
                         if (validationErrors.isNotEmpty()) {
                             Card(
@@ -674,10 +675,10 @@ fun QuestionEditorDialog(
                                 }
                             }
                         }
-                        
+
                         Spacer(Modifier.height(24.dp))
-                    } 
-                } 
+                    }
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                     horizontalArrangement = Arrangement.End
@@ -693,15 +694,15 @@ fun QuestionEditorDialog(
                             QUESTION_TYPE_SINGLE_CHOICE_CQS -> selectedSingleAnswer?.let { listOf(it) }
                             else -> if (correctAnswersMulti.isNotEmpty()) correctAnswersMulti.toList() else null
                         }
-                        
+
                         // Validation checks
                         val currentValidationErrors = mutableListOf<String>()
-                        
+
                         // Check points
                         if (questionPoints < 1) {
                             currentValidationErrors.add("Question must have at least 1 point")
                         }
-                        
+
                         // Check correct answer
                         if (finalCorrectAnswers == null || finalCorrectAnswers.isEmpty()) {
                             when (type) {
@@ -710,23 +711,23 @@ fun QuestionEditorDialog(
                                 QUESTION_TYPE_MULTIPLE_CHOICE_CQS -> currentValidationErrors.add("Multiple choice question must have at least one correct answer selected")
                             }
                         }
-                        
+
                         // Check question text
                         if (text.isBlank()) {
                             currentValidationErrors.add("Question text cannot be empty")
                         }
-                        
+
                         // Check options for choice questions
                         if (type != QUESTION_TYPE_TEXT_INPUT_CQS && options.isEmpty()) {
                             currentValidationErrors.add("Choice questions must have at least one option")
                         }
-                        
+
                         // If there are validation errors, show them and don't save
                         if (currentValidationErrors.isNotEmpty()) {
                             validationErrors = currentValidationErrors
                             return@Button
                         }
-                        
+
                         // Ensure options are unique (case-insensitive, trimmed)
                         val uniqueOptions = if (type == QUESTION_TYPE_TEXT_INPUT_CQS) emptyList() else options
                             .map { it.trim() }

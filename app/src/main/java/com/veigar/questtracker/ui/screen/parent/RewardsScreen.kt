@@ -32,7 +32,7 @@ import com.veigar.questtracker.ui.component.rewards.EditRewardDialog
 import com.veigar.questtracker.ui.component.rewards.RedemptionHistorySheet
 import com.veigar.questtracker.ui.component.rewards.RewardListContent
 import com.veigar.questtracker.ui.component.rewards.WishlistContent
-import com.veigar.questtracker.ui.screen.parent.tab.ChildChip
+import com.veigar.questtracker.ui.component.ChildChip // Corrected import
 import com.veigar.questtracker.ui.theme.CoralBlueDark
 import com.veigar.questtracker.ui.theme.ProfessionalGray
 import com.veigar.questtracker.ui.theme.ProfessionalGrayDark
@@ -177,7 +177,7 @@ fun RewardsScreen(
                     thickness = 1.dp,
                     color = ProfessionalGrayText.copy(alpha = 0.3f)
                 )
-                
+
                 // Wishlist header with better typography
                 Text(
                     text = "${uiState.selectedChild.name}'s Wishlist",

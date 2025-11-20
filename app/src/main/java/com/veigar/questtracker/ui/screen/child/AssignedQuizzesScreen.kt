@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -46,8 +45,8 @@ import com.veigar.questtracker.NavRoutes
 import com.veigar.questtracker.model.Quiz
 import com.veigar.questtracker.viewmodel.ChildQuizViewModel
 import com.veigar.questtracker.viewmodel.QuizStatus
-import com.veigar.questtracker.ui.screen.parent.tab.OneTimeQuestGradientStart
-import com.veigar.questtracker.ui.screen.parent.tab.OneTimeQuestGradientEnd
+import com.veigar.questtracker.ui.theme.OneTimeQuestGradientStart
+import com.veigar.questtracker.ui.theme.OneTimeQuestGradientEnd
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -286,7 +285,7 @@ private fun StatusChip(status: QuizStatus) {
         QuizStatus.OVERDUE -> "Overdue" to MaterialTheme.colorScheme.error
         QuizStatus.COMPLETED -> "Completed" to Color(0xFFBF8C00)
     }
-    
+
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,

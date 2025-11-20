@@ -29,8 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.veigar.questtracker.R
-import com.veigar.questtracker.ui.screen.parent.tab.DailyQuestGradientEnd
-import com.veigar.questtracker.ui.screen.parent.tab.DailyQuestGradientStart
+import com.veigar.questtracker.ui.theme.DailyQuestGradientEnd
+import com.veigar.questtracker.ui.theme.DailyQuestGradientStart
 
 @Composable
 fun PrizeBanner(
@@ -143,5 +143,3 @@ fun PrizeBannerIcon(iconUrl: String?) {
             .clip(CircleShape)
     )
 }
-
-

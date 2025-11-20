@@ -113,11 +113,14 @@ fun MainNavHost(
                 navArgument("parentId") { type = NavType.StringType },
                 navArgument("childId") { type = NavType.StringType }
             )
-        ) {
-            LocationHistoryScreen(navController = navController)
+        ) { backStackEntry ->
+            val parentId = backStackEntry.arguments?.getString("parentId") ?: return@composable
+            val childId = backStackEntry.arguments?.getString("childId") ?: return@composable
+            LocationHistoryScreen(navController = navController, parentId = parentId, childId = childId)
         }
         composable(NavRoutes.CompletedTaskHistory.route) {
-            CompletedTaskHistoryScreen(navController = navController)
+            // Assuming this screen handles its own arguments or defaults if accessed via this route
+            CompletedTaskHistoryScreen(navController = navController, childId = "")
         }
         composable(
             route = NavRoutes.QuizAttemptReview.route,
@@ -143,14 +146,12 @@ fun MainNavHost(
         composable(NavRoutes.Leaderboards.route) {
             LeaderboardsScreen(navController = navController)
         }
-        // Fallback or specific routes if needed
         composable(
             route = NavRoutes.CompletedTasks.route,
             arguments = listOf(navArgument("childId") { type = NavType.StringType })
-        ) {
-            // Reuse CompletedTaskHistoryScreen or create a new one.
-            // Assuming reusing logic or it handles its own args if using ViewModel.
-            CompletedTaskHistoryScreen(navController = navController)
+        ) { backStackEntry ->
+            val childId = backStackEntry.arguments?.getString("childId") ?: ""
+            CompletedTaskHistoryScreen(navController = navController, childId = childId)
         }
     }
 }
