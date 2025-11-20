@@ -132,10 +132,6 @@ fun GeofenceTab(
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
-        // FIX: UI Logic Refactored to prevent unmounting the Map (which causes crashes)
-        // Instead of switching views completely, we layer them.
-
-        // 1. Base Layer: Permissions or Map
         if (!locationPermissionsState.allPermissionsGranted) {
             PermissionRequestUI(
                 onGrantPermissionsClick = {
@@ -144,9 +140,7 @@ fun GeofenceTab(
                 shouldShowRationale = locationPermissionsState.shouldShowRationale
             )
         } else {
-            // Permissions granted
             if (uiState.showMap && uiState.deviceLocation != null) {
-                // Show Map
                 MapContainer(
                     deviceLocation = uiState.deviceLocation!!,
                     geofences = uiState.geofences,
@@ -176,7 +170,6 @@ fun GeofenceTab(
                     focusedChildId = focusedChildId
                 )
             } else {
-                // Map not ready yet (getting location), show placeholder
                 GetLocationUI(
                     isLoading = uiState.isFetchingLocation,
                     onGetLocationClick = {
@@ -189,7 +182,6 @@ fun GeofenceTab(
             }
         }
 
-        // 2. Overlay Layer: Loading Indicator (if refreshing while map is already shown)
         if (uiState.showMap && uiState.isFetchingLocation) {
             Box(
                 modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.2f)),
@@ -200,7 +192,6 @@ fun GeofenceTab(
         }
     }
 
-    // --- Dialogs ---
     if (uiState.showAddGeofenceDialog) {
         AddOrEditGeofenceDialog(
             dialogTitle = "Add Geofence Details",
@@ -255,7 +246,6 @@ fun MapContainer(
         position = CameraPosition.fromLatLngZoom(deviceLocation, 2f)
     }
 
-    // Re-center camera when deviceLocation updates (e.g., after refresh)
     LaunchedEffect(deviceLocation, isMapInitializationComplete) {
         if (isMapInitializationComplete) {
             cameraPositionState.animate(

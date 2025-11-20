@@ -13,7 +13,6 @@ import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -25,6 +24,7 @@ import com.veigar.questtracker.data.UserRepository
 import com.veigar.questtracker.model.NotificationCategory
 import com.veigar.questtracker.model.NotificationModel
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collectLatest
 
 class MainService : Service(), NotificationDisplayer {
 
@@ -34,6 +34,7 @@ class MainService : Service(), NotificationDisplayer {
     private lateinit var notificationMonitor: NotificationMonitor
     private var locationMonitor : LocationMonitor? = null
     private var geofenceMonitor : GeofenceMonitor? = null
+    private var userProfileJob: Job? = null
 
     private lateinit var connectivityManager: ConnectivityManager
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
@@ -94,8 +95,8 @@ class MainService : Service(), NotificationDisplayer {
             registerReceiver(taskUpdateReceiver, intentFilter)
         }
 
-        // FIX: Provide foreground service type for Android 14+ compliance
-        // We combine DATA_SYNC and LOCATION to match the manifest and support location tracking
+        // FIX: Explicitly set foreground service type for Android 14+
+        // Must match manifest: dataSync|location
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 ONGOING_NOTIFICATION_ID,
@@ -117,32 +118,65 @@ class MainService : Service(), NotificationDisplayer {
                 stopServiceTasksAndSelf()
             }
         }
-        return START_STICKY // Or START_NOT_STICKY if you don't want it to auto-restart
+        return START_STICKY
     }
 
     private fun start() {
-        serviceScope.launch {
-            val user = UserRepository.getUserProfile()
-            if (user == null) {
-                Log.e(TAG, "User is null. Cannot start monitoring.")
-                return@launch
-            }
-            notificationMonitor.startMonitoring()
-            if(user.role == "child"){
-                if(user.parentLinkedId.isNullOrBlank()){
-                    Log.e(TAG, "Parent not linked. Cannot start monitoring.")
-                    return@launch
+        // Cancel any existing job to prevent duplicates
+        userProfileJob?.cancel()
+
+        userProfileJob = serviceScope.launch {
+            // FIX: Observe user profile continuously.
+            // This ensures if a child links a parent while the service is running,
+            // monitoring starts IMMEDIATELY without restart.
+            UserRepository.observeUserProfile().collectLatest { user ->
+                if (user == null) {
+                    Log.e(TAG, "User is null. Pausing monitoring.")
+                    stopMonitors()
+                    return@collectLatest
                 }
-                Log.d(TAG, "Starting location monitoring for ${user.getDecodedUid()}")
-                locationMonitor = LocationMonitor(applicationContext, user, serviceScope = serviceScope)
-                locationMonitor?.startTracking()
-                geofenceMonitor = GeofenceMonitor(applicationContext, user, serviceScope)
-                geofenceMonitor?.loadAndRegisterGeofences()
+
+                // Always start notification monitor for logged in users
+                notificationMonitor.startMonitoring()
+
+                if (user.role == "child") {
+                    if (user.parentLinkedId.isNullOrBlank()) {
+                        Log.d(TAG, "Child account, but no parent linked yet. Waiting...")
+                        stopMonitors() // Stop if they unlinked
+                    } else {
+                        Log.d(TAG, "Parent linked: ${user.parentLinkedId}. Starting monitors.")
+
+                        // Initialize monitors if null
+                        if (locationMonitor == null) {
+                            locationMonitor = LocationMonitor(applicationContext, user, serviceScope = serviceScope)
+                        }
+                        if (geofenceMonitor == null) {
+                            geofenceMonitor = GeofenceMonitor(applicationContext, user, serviceScope)
+                        }
+
+                        // Start tracking
+                        locationMonitor?.startTracking()
+                        geofenceMonitor?.loadAndRegisterGeofences()
+                        updateOngoingNotification("Monitoring active")
+                    }
+                } else {
+                    // Parent role - typically doesn't need these monitors in background,
+                    // but if you want parent location tracking, add here.
+                    stopMonitors()
+                }
             }
         }
     }
+
+    private fun stopMonitors() {
+        locationMonitor?.stopTracking()
+        geofenceMonitor?.clearAllGeofences()
+    }
+
     private fun stopServiceTasksAndSelf() {
         Log.d(TAG, "Stopping service tasks and service...")
+        userProfileJob?.cancel()
+        stopMonitors()
         notificationMonitor.stopMonitoring()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -153,123 +187,31 @@ class MainService : Service(), NotificationDisplayer {
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 super.onAvailable(network)
-                // When a network becomes available, check its capabilities immediately
                 val capabilities = connectivityManager.getNetworkCapabilities(network)
                 val isInternet = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
                 val isValidated = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
 
                 if (isInternet && isValidated) {
-                    if (!isNetworkAvailable) { // Only update if state actually changed
+                    if (!isNetworkAvailable) {
                         isNetworkAvailable = true
-                        Log.i(TAG, "Network available and validated. Connected to: $network")
+                        Log.i(TAG, "Network available. Resuming monitoring.")
                         updateOngoingNotification("Network connected. Monitoring active.")
-                        locationMonitor?.startTracking()
-                        notificationMonitor.startMonitoring()
-                        // If there are tasks that were pending due to no network, you might trigger them here.
-                        // e.g., serviceScope.launch { attemptPendingUploads() }
-                    } else {
-                        Log.i(TAG, "Network available and validated, but already marked as available. Network: $network")
-                    }
-                } else {
-                    // Network available but not yet validated or no internet. Keep current state or indicate partial.
-                    Log.w(TAG, "Network available ($network) but not yet validated or no internet. Has Internet? $isInternet, Is Validated? $isValidated")
-                    // Do not set isNetworkAvailable to true here, wait for onCapabilitiesChanged for validation.
-                    if (isNetworkAvailable) { // If it was previously available but now the default has issues
-                        // This case might be better handled by onCapabilitiesChanged for the default network
-                        // or if the *active* network loses capabilities.
+                        // Re-trigger start to ensure everything is running
+                        start()
                     }
                 }
             }
 
             override fun onLost(network: Network) {
                 super.onLost(network)
-                // This is called when the *default* network (monitored by registerDefaultNetworkCallback) is lost.
-                // Check if there's any active network left that can provide internet.
-                val activeNetwork = connectivityManager.activeNetwork // This is the *current* default network after the loss
-                if (activeNetwork == null) {
-                    // No active network means no internet connection via the default path
-                    if (isNetworkAvailable) { // Only update if state actually changed
+                if (isNetworkAvailable) {
+                    // Check if there is truly no active network
+                    if (connectivityManager.activeNetwork == null) {
                         isNetworkAvailable = false
-                        Log.w(TAG, "Network lost. No active network connection. Lost Network: $network")
+                        Log.w(TAG, "Network lost.")
                         updateOngoingNotification("Network disconnected. Waiting...")
-                        locationMonitor?.stopTracking()
-                        notificationMonitor.stopMonitoring()
-                    } else {
-                        Log.i(TAG, "Network lost, but already marked as unavailable. Lost Network: $network")
+                        stopMonitors()
                     }
-                } else {
-                    // A network was lost, but another one (activeNetwork) is still available and likely the new default.
-                    Log.i(TAG, "Default network ($network) was lost, but another network is still active: $activeNetwork")
-                    // Re-evaluate the capabilities of the *new* active network
-                    val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
-                    val isInternet = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-                    val isValidated = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
-
-                    if (isInternet && isValidated) {
-                        // New active network is good, state remains available
-                        Log.i(TAG, "New active network ($activeNetwork) is validated and has internet.")
-                        // isNetworkAvailable should already be true if the system seamlessly switched.
-                    } else {
-                        // New active network does not have internet or is not validated.
-                        if (isNetworkAvailable) { // Only update if state actually changed
-                            isNetworkAvailable = false
-                            Log.w(TAG, "New active network ($activeNetwork) does not have internet or is not validated.")
-                            updateOngoingNotification("Network connectivity issue. Waiting...")
-                            locationMonitor?.stopTracking()
-                            notificationMonitor.stopMonitoring()
-                        }
-                    }
-                }
-            }
-
-            override fun onCapabilitiesChanged(
-                network: Network,
-                networkCapabilities: NetworkCapabilities
-            ) {
-                super.onCapabilitiesChanged(network, networkCapabilities)
-                val isInternet = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                val isValidated = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-                Log.i(TAG, "Network capabilities changed for $network: Has Internet? $isInternet, Is Validated? $isValidated")
-
-                // We only care about the capabilities of the *currently active* default network
-                val activeNetwork = connectivityManager.activeNetwork
-
-                if (activeNetwork == network) { // Check if the changed network is our current default
-                    if (isInternet && isValidated) {
-                        if (!isNetworkAvailable) { // If it was previously marked as unavailable
-                            isNetworkAvailable = true
-                            Log.i(TAG, "Active network ($network) re-validated and has internet. Monitoring active.")
-                            updateOngoingNotification("Network connected. Monitoring active.")
-                            locationMonitor?.startTracking()
-                            notificationMonitor.startMonitoring()
-                        }
-                    } else {
-                        // If the current default network loses internet or validation
-                        if (isNetworkAvailable) { // Only update if state actually changed
-                            isNetworkAvailable = false
-                            Log.w(TAG, "Active network ($network) no longer has internet or is not validated.")
-                            updateOngoingNotification("Network connectivity issue. Waiting...")
-                            locationMonitor?.stopTracking()
-                            notificationMonitor.stopMonitoring()
-                        }
-                    }
-                } else {
-                    Log.i(TAG, "Capabilities changed for a non-default network: $network. Current default: $activeNetwork")
-                }
-            }
-
-            override fun onUnavailable() {
-                super.onUnavailable()
-                // Called when the framework has indicated it will not be able to satisfy this request (default network).
-                // This is a strong indication of no internet connectivity.
-                if (isNetworkAvailable) { // Only update if state actually changed
-                    isNetworkAvailable = false
-                    Log.w(TAG, "Default network unavailable for the request. No active internet.")
-                    updateOngoingNotification("Network unavailable. Waiting...")
-                    locationMonitor?.stopTracking()
-                    notificationMonitor.stopMonitoring()
-                } else {
-                    Log.i(TAG, "Default network unavailable, but already marked as unavailable.")
                 }
             }
         }
@@ -281,43 +223,9 @@ class MainService : Service(), NotificationDisplayer {
         }
         networkCallback?.let {
             try {
-                // Register for the default network callback to get overall internet connectivity status
                 connectivityManager.registerDefaultNetworkCallback(it)
-                Log.i(TAG, "Default Network callback registered.")
-
-                // Check initial state
-                val activeNetwork = connectivityManager.activeNetwork
-                if (activeNetwork != null) {
-                    val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
-                    if (capabilities != null &&
-                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
-                        isNetworkAvailable = true
-                        Log.i(TAG, "Initial network check: Network available and validated.")
-                        locationMonitor?.startTracking()
-                        notificationMonitor.startMonitoring()
-                        updateOngoingNotification("Monitoring active...")
-                    } else {
-                        isNetworkAvailable = false
-                        Log.w(TAG, "Initial network check: Network available but no internet/not validated.")
-                        locationMonitor?.stopTracking()
-                        notificationMonitor.stopMonitoring()
-                        updateOngoingNotification("Network connectivity issue. Waiting...")
-                    }
-                } else {
-                    isNetworkAvailable = false
-                    Log.w(TAG, "Initial network check: No active network.")
-                    locationMonitor?.stopTracking()
-                    notificationMonitor.stopMonitoring()
-                    updateOngoingNotification("Waiting for network...")
-                }
-
             } catch (e: SecurityException) {
-                Log.e(TAG, "Failed to register network callback due to SecurityException. Check permissions.", e)
-                // Handle the case where permission might be missing or revoked at runtime
-                updateOngoingNotification("Permission error: Network monitoring unavailable.")
-                locationMonitor?.stopTracking()
-                notificationMonitor.stopMonitoring()
+                Log.e(TAG, "Failed to register network callback", e)
             }
         }
     }
@@ -326,8 +234,7 @@ class MainService : Service(), NotificationDisplayer {
         networkCallback?.let {
             try {
                 connectivityManager.unregisterNetworkCallback(it)
-                Log.i(TAG, "Network callback unregistered.")
-            } catch (e: Exception) { // Can sometimes throw IllegalArgumentException if not registered
+            } catch (e: Exception) {
                 Log.w(TAG, "Error unregistering network callback: ${e.message}")
             }
             networkCallback = null
@@ -341,10 +248,10 @@ class MainService : Service(), NotificationDisplayer {
     override fun onDestroy() {
         Log.d(TAG, "Service onDestroy")
         notificationQueueJob?.cancel()
+        userProfileJob?.cancel()
         unregisterNetworkCallback()
+        stopMonitors()
         notificationMonitor.stopMonitoring()
-        locationMonitor?.stopTracking()
-        geofenceMonitor?.clearAllGeofences()
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(DAILY_TASKS_NOTIFICATION_ID)
         unregisterReceiver(taskUpdateReceiver)
@@ -355,38 +262,26 @@ class MainService : Service(), NotificationDisplayer {
     // --- NotificationDisplayer Implementation ---
 
     override fun showNotification(notification: NotificationModel) {
-        // Add to queue instead of showing immediately
         serviceScope.launch {
             synchronized(notificationQueue) {
-                // Remove duplicate notifications with same ID
                 notificationQueue.removeAll { it.notificationId == notification.notificationId }
                 notificationQueue.add(notification)
-                Log.d(TAG, "Added notification to queue: ${notification.title}. Queue size: ${notificationQueue.size}")
             }
         }
     }
 
-    /**
-     * Processes the notification queue one at a time with delays to prevent stacking
-     * Urgent notifications are prioritized and shown first
-     */
     private fun startNotificationQueueProcessor() {
         notificationQueueJob = serviceScope.launch {
             while (isActive) {
                 val notification = synchronized(notificationQueue) {
                     if (notificationQueue.isNotEmpty() && !isShowingNotification) {
                         isShowingNotification = true
-                        // Prioritize urgent notifications (task changes, rewards, system)
                         val urgentIndex = notificationQueue.indexOfFirst { notif ->
                             notif.category == NotificationCategory.TASK_CHANGE ||
                                     notif.category == NotificationCategory.REWARD ||
                                     notif.category == NotificationCategory.SYSTEM
                         }
-                        if (urgentIndex >= 0) {
-                            notificationQueue.removeAt(urgentIndex)
-                        } else {
-                            notificationQueue.removeAt(0)
-                        }
+                        if (urgentIndex >= 0) notificationQueue.removeAt(urgentIndex) else notificationQueue.removeAt(0)
                     } else {
                         null
                     }
@@ -394,22 +289,15 @@ class MainService : Service(), NotificationDisplayer {
 
                 if (notification != null) {
                     displayNotification(notification)
-                    // Shorter delay for urgent notifications to feel more immediate
-                    val isUrgent = notification.category == NotificationCategory.TASK_CHANGE ||
-                            notification.category == NotificationCategory.REWARD ||
-                            notification.category == NotificationCategory.SYSTEM
-                    delay(if (isUrgent) NOTIFICATION_QUEUE_DELAY_MS / 2 else NOTIFICATION_QUEUE_DELAY_MS)
+                    delay(NOTIFICATION_QUEUE_DELAY_MS)
                     isShowingNotification = false
                 } else {
-                    delay(500) // Check queue every 500ms
+                    delay(500)
                 }
             }
         }
     }
 
-    /**
-     * Actually displays the notification with appropriate priority and urgency
-     */
     private suspend fun displayNotification(notification: NotificationModel) {
         NotificationsRepository.setNotificationRead(UserRepository.currentUserId()!!, notification.notificationId)
 
@@ -432,7 +320,6 @@ class MainService : Service(), NotificationDisplayer {
             pendingIntentFlags
         )
 
-        // Determine priority and channel based on category
         val isUrgent = notification.category == NotificationCategory.TASK_CHANGE ||
                 notification.category == NotificationCategory.REWARD ||
                 notification.category == NotificationCategory.SYSTEM
@@ -452,16 +339,12 @@ class MainService : Service(), NotificationDisplayer {
             .setStyle(NotificationCompat.BigTextStyle().bigText(notification.message ?: "You have a new update."))
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        // Use a combination of notificationId hash and timestamp for unique IDs
-        // This ensures each notification gets a unique system ID even if they arrive simultaneously
         val uniqueId = (notification.notificationId.hashCode() xor System.currentTimeMillis().toInt()) and 0x7FFFFFFF
 
         notificationManager.notify(uniqueId, notificationBuilder.build())
-        Log.d(TAG, "Displayed system notification: ${notification.title} (Urgent: $isUrgent, ID: $uniqueId)")
     }
 
     override fun updateOngoingNotification(message: String) {
-        // Use serviceScope (Main dispatcher)
         serviceScope.launch {
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.notify(ONGOING_NOTIFICATION_ID, createOngoingNotification(message))
@@ -472,69 +355,52 @@ class MainService : Service(), NotificationDisplayer {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val tasksChannel = NotificationChannel(
                 DAILY_TASKS_CHANNEL_ID,
-                "Daily Tasks", // User-visible name
-                NotificationManager.IMPORTANCE_LOW // Or .DEFAULT if you want it more prominent but still ongoing
+                "Daily Tasks",
+                NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Shows your daily tasks from QuestTracker."
-                setShowBadge(false) // Typically for ongoing notifications
+                setShowBadge(false)
             }
             getSystemService(NotificationManager::class.java)?.createNotificationChannel(tasksChannel)
         }
     }
 
     private fun createOrUpdateDailyTasksNotification() {
-        val taskInfo = dailyTaskNotifier.getTaskContentForNotification() // Or getTaskContentAsBigText()
-
+        val taskInfo = dailyTaskNotifier.getTaskContentForNotification()
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // Intent for when the tasks notification is tapped
         val tasksIntent = Intent(this, MainActivity::class.java).apply {
-            // Optionally, add extras to navigate to a specific tasks screen
-            // putExtra("navigate_to", NavRoutes.TasksScreen.route)
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val tasksPendingIntent = PendingIntent.getActivity(
             this,
-            DAILY_TASKS_NOTIFICATION_ID, // Use the notification ID as request code for PendingIntent
+            DAILY_TASKS_NOTIFICATION_ID,
             tasksIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        val builder = NotificationCompat.Builder(this, DAILY_TASKS_CHANNEL_ID)
+            .setSmallIcon(R.drawable.to_do_list)
+            .setContentTitle("DAILY TASKS")
+            .setContentText(if (taskInfo.hasTasks) taskInfo.contentText else "No tasks for today!")
+            .setContentIntent(tasksPendingIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+
         if (taskInfo.hasTasks) {
-            val builder = NotificationCompat.Builder(this, DAILY_TASKS_CHANNEL_ID)
-                .setSmallIcon(R.drawable.to_do_list) // A specific icon for tasks is good
-                .setContentTitle("DAILY TASKS")
-                .setContentText(taskInfo.contentText)
-                .setStyle(taskInfo.style)
-                .setContentIntent(tasksPendingIntent)
-                .setOngoing(true) // Makes it persistent like the primary one
-                .setOnlyAlertOnce(true) // No sound/vibrate on updates
-                .setPriority(NotificationCompat.PRIORITY_LOW) // Or .DEFAULT
-
-            notificationManager.notify(DAILY_TASKS_NOTIFICATION_ID, builder.build())
-            Log.d(TAG, "Daily Tasks notification updated/shown with ${taskInfo.contentText}")
-        } else {
-            val builder = NotificationCompat.Builder(this, DAILY_TASKS_CHANNEL_ID)
-                .setSmallIcon(R.drawable.to_do_list)
-                .setContentTitle("DAILY TASKS")
-                .setContentText("No tasks for today!")
-                .setContentIntent(tasksPendingIntent)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-            notificationManager.notify(DAILY_TASKS_NOTIFICATION_ID, builder.build())
-            Log.d(TAG, "Daily Tasks notification shown: No tasks.")
+            builder.setStyle(taskInfo.style)
         }
-    }
 
-    // --- Helper methods for Foreground Service Notification ---
+        notificationManager.notify(DAILY_TASKS_NOTIFICATION_ID, builder.build())
+    }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
-                "QuestTracker Updates", // User-visible name
-                NotificationManager.IMPORTANCE_DEFAULT // Default importance for regular notifications
+                "QuestTracker Updates",
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "General app notifications and updates."
                 enableVibration(false)
@@ -549,8 +415,8 @@ class MainService : Service(), NotificationDisplayer {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val urgentChannel = NotificationChannel(
                 URGENT_NOTIFICATION_CHANNEL_ID,
-                "QuestTracker Important", // User-visible name
-                NotificationManager.IMPORTANCE_HIGH // High importance for urgent notifications
+                "QuestTracker Important",
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Urgent notifications like task approvals, rewards, and important updates."
                 enableVibration(true)
@@ -578,9 +444,9 @@ class MainService : Service(), NotificationDisplayer {
             .setContentText(text)
             .setSmallIcon(R.drawable.heart)
             .setContentIntent(pendingIntent)
-            .setOngoing(true) // Makes it a non-dismissable foreground notification
-            .setPriority(NotificationCompat.PRIORITY_LOW) // For less intrusive ongoing notifications
-            .setOnlyAlertOnce(true) // Don't make sound/vibrate for subsequent updates
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOnlyAlertOnce(true)
             .build()
     }
 }
