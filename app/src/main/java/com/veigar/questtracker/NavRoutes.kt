@@ -28,11 +28,22 @@ sealed class NavRoutes(val route: String) {
     object Quizzes : NavRoutes("quizzes")
     object LocationHistory : NavRoutes("location_history")
     object CompletedTaskHistory : NavRoutes("completed_task_history")
+
     object QuizAttemptReview : NavRoutes("quiz_attempt_review/{attemptId}") {
         fun createRoute(attemptId: String) = "quiz_attempt_review/$attemptId"
     }
+
     object TakeQuiz : NavRoutes("take_quiz/{quizId}") {
         fun createRoute(quizId: String) = "take_quiz/$quizId"
     }
+
     object AssignedQuizzes : NavRoutes("assigned_quizzes")
+    object Leaderboards : NavRoutes("leaderboards")
+
+    // Adding potentially missing routes that were referenced
+    object EditQuiz : NavRoutes("edit_quiz/{quizId}") {
+        fun createRoute(quizId: String) = "edit_quiz/$quizId"
+    }
+
+    object CompletedTasks : NavRoutes("completed_tasks")
 }

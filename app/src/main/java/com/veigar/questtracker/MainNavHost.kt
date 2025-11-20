@@ -3,6 +3,8 @@ package com.veigar.questtracker
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -31,11 +33,16 @@ import com.veigar.questtracker.ui.screen.profile.ProfileSetUpScreen
 import com.veigar.questtracker.ui.screen.role.ParentSubRoleScreen
 import com.veigar.questtracker.ui.screen.role.RoleSelectorScreen
 import com.veigar.questtracker.ui.screen.splash.Splash
+import com.veigar.questtracker.viewmodel.ParentDashboardViewModel
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun MainNavHost(navController: NavHostController) {
-    NavHost(navController = navController, startDestination = NavRoutes.Splash.route) {
+fun MainNavHost(
+    navController: NavHostController,
+    startDestination: String = NavRoutes.Splash.route,
+    activityViewModelStoreOwner: ViewModelStoreOwner? = null
+) {
+    NavHost(navController = navController, startDestination = startDestination) {
         composable(NavRoutes.Splash.route) {
             Splash(navController = navController)
         }
@@ -72,17 +79,12 @@ fun MainNavHost(navController: NavHostController) {
                 navArgument("requestId") { defaultValue = "" }
             )
         ) { backStackEntry ->
-            val title = backStackEntry.arguments?.getString("title") ?: ""
-            val desc = backStackEntry.arguments?.getString("desc") ?: ""
-            val childId = backStackEntry.arguments?.getString("childId") ?: ""
-            val requestId = backStackEntry.arguments?.getString("requestId") ?: ""
+            // Get ParentDashboardViewModel to share state if needed, or let screen create its own
+            val viewModel: ParentDashboardViewModel = viewModel()
 
             CreateTaskScreen(
                 navController = navController,
-                initialTitle = title,
-                initialDescription = desc,
-                initialChildId = childId,
-                requestId = requestId
+                viewModel = viewModel
             )
         }
         composable(NavRoutes.CreateQuiz.route) {

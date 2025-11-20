@@ -4,7 +4,7 @@ import android.content.Context
 import android.location.Location
 import android.net.Uri
 import android.os.Build
-import android.util.Log // Added this import
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -30,7 +30,7 @@ import com.veigar.questtracker.model.RewardModel
 import com.veigar.questtracker.model.TaskModel
 import com.veigar.questtracker.model.TaskStatus
 import com.veigar.questtracker.model.UserModel
-import com.veigar.questtracker.model.RewardsModel // Added this import
+import com.veigar.questtracker.model.RewardsModel
 import com.veigar.questtracker.util.ImageManager
 import com.veigar.questtracker.util.isDailyTaskDue
 import com.veigar.questtracker.util.isTaskActive

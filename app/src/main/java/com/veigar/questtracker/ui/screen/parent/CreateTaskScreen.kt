@@ -24,7 +24,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,13 +35,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.veigar.questtracker.data.FirebaseAuthRepository
 import com.veigar.questtracker.data.NotificationsRepository
 import com.veigar.questtracker.data.TaskRepository
-import com.veigar.questtracker.model.DayOfWeek
 import com.veigar.questtracker.model.NotificationCategory
 import com.veigar.questtracker.model.NotificationData
 import com.veigar.questtracker.model.NotificationModel
@@ -51,23 +47,19 @@ import com.veigar.questtracker.model.RepeatRule
 import com.veigar.questtracker.model.TaskModel
 import com.veigar.questtracker.model.TaskReward
 import com.veigar.questtracker.model.TaskStatus
-import com.veigar.questtracker.model.UserModel
 import com.veigar.questtracker.ui.component.createtask.AssignToChildSection
 import com.veigar.questtracker.ui.component.createtask.CreateTaskTopBar
 import com.veigar.questtracker.ui.component.createtask.DailyFrequency
 import com.veigar.questtracker.ui.component.createtask.DifficultySelector
 import com.veigar.questtracker.ui.component.createtask.IconPickerSection
-import com.veigar.questtracker.ui.component.createtask.LabeledIntField
 import com.veigar.questtracker.ui.component.createtask.LabeledTextField
 import com.veigar.questtracker.ui.component.createtask.RepeatTaskSection
 import com.veigar.questtracker.ui.component.createtask.ScheduleSection
-import com.veigar.questtracker.ui.theme.CoralBlueDark
 import com.veigar.questtracker.ui.theme.ProfessionalGrayDark
 import com.veigar.questtracker.util.debounced
 import com.veigar.questtracker.viewmodel.ParentDashboardViewModel
 import java.time.LocalDate
 import java.time.LocalTime
-import kotlin.collections.emptySet
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -80,18 +72,24 @@ fun CreateTaskScreen(
     val taskToEdit by viewModel.selectedTask.collectAsStateWithLifecycle()
     Log.d("CreateTaskScreen", "Task to edit: $taskToEdit")
     val isEditing = taskToEdit != null
-    // val scope = rememberCoroutineScope() // Keep if needed for async operations within this screen
+
+    // Handle Navigation Arguments
+    val navBackStackEntry = navController.currentBackStackEntry
+    val titleArg = navBackStackEntry?.arguments?.getString("title") ?: ""
+    val descArg = navBackStackEntry?.arguments?.getString("desc") ?: ""
+    val childIdArg = navBackStackEntry?.arguments?.getString("childId")
+    val requestIdArg = navBackStackEntry?.arguments?.getString("requestId")
+
     BackHandler(enabled = true) {
         navController.popBackStack()
     }
     // --- Main Task Details ---
-    var title by remember { mutableStateOf(taskToEdit?.title ?: "") }
-    var description by remember { mutableStateOf(taskToEdit?.description ?: "") }
+    var title by remember { mutableStateOf(taskToEdit?.title ?: titleArg) }
+    var description by remember { mutableStateOf(taskToEdit?.description ?: descArg) }
 
     // --- Difficulty and Rewards ---
-    // These will be updated by DifficultySelector
-    var xpReward by remember { mutableIntStateOf(taskToEdit?.rewards?.xp ?: 10) } // Default to easy
-    var goldReward by remember { mutableIntStateOf(taskToEdit?.rewards?.coins ?: 5) } // Default to easy
+    var xpReward by remember { mutableIntStateOf(taskToEdit?.rewards?.xp ?: 10) }
+    var goldReward by remember { mutableIntStateOf(taskToEdit?.rewards?.coins ?: 5) }
 
     // --- Scheduling ---
     var startDate by remember { mutableStateOf(LocalDate.parse(taskToEdit?.startDate ?: LocalDate.now().toString())) }
@@ -122,19 +120,19 @@ fun CreateTaskScreen(
         mutableStateOf(
             taskToEdit?.assignedTo?.let { assignedToString ->
                 if (assignedToString.isBlank()) {
-                    emptySet() // Handle empty or blank string
+                    emptySet()
                 } else {
-                    assignedToString.substring(1, assignedToString.length - 1) // Remove brackets: "uid1, uid2"
-                        .split(',')                                 // Split by comma
-                        .map { it.trim() }                          // Trim whitespace
-                        .filter { it.isNotEmpty() }                 // Filter out empty strings
+                    assignedToString.substring(1, assignedToString.length - 1)
+                        .split(',')
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
                         .toSet()
                 }
-            } ?: selectedChild?.getDecodedUid()?.let { setOf(it) } ?: emptySet<String>()
+            } ?: if (childIdArg != null && childIdArg.isNotEmpty()) setOf(childIdArg) else selectedChild?.getDecodedUid()?.let { setOf(it) } ?: emptySet<String>()
         )
     }
 
-    var taskIconBaseName by remember { mutableStateOf(taskToEdit?.icon ?: "others") } // Default or empty, e.g., "study"
+    var taskIconBaseName by remember { mutableStateOf(taskToEdit?.icon ?: "others") }
 
     var parentUid by remember { mutableStateOf(FirebaseAuthRepository.currentUser()?.uid ?: "") }
 
@@ -183,18 +181,17 @@ fun CreateTaskScreen(
             }
         }
 
-
         val task = TaskModel(
             title = title,
             description = description,
-            assignedTo = selectedChildrenUids.toString(), // Assuming UserModel has an 'id' field
+            assignedTo = selectedChildrenUids.toString(),
             rewards = TaskReward(xp = xpReward, coins = goldReward),
             icon = taskIconBaseName,
             repeat = if (isRepeating) {
                 val days = if (repeatFrequency == RepeatFrequency.DAILY) {
-                    emptyList() // No days needed for daily repeat
+                    emptyList()
                 } else {
-                    selectedDays.toList().sorted() // Ensure consistent order for other frequencies
+                    selectedDays.toList().sorted()
                 }
                 RepeatRule(
                     frequency = repeatFrequency,
@@ -207,7 +204,7 @@ fun CreateTaskScreen(
             startDate = startDate.toString(),
             endDate = endDate?.toString(),
             reminderTime = reminderTime?.toString(),
-            status = TaskStatus.PENDING // Add if your TaskModel needs this
+            status = TaskStatus.PENDING
         )
 
         if(isEditing){
@@ -261,6 +258,12 @@ fun CreateTaskScreen(
                             notification = notification
                         )
                     }
+
+                    // If this task came from a request, approve the request
+                    if (!requestIdArg.isNullOrBlank()) {
+                        viewModel.updateQuestRequestStatus(requestIdArg, "ACCEPTED")
+                    }
+
                     Toast.makeText(context, "Quest Created!", Toast.LENGTH_SHORT).show()
                     navController.popBackStack()
                 } else {
@@ -299,9 +302,8 @@ fun CreateTaskScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp) // Adds space between sections
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // --- Task Title ---
                 LabeledTextField(
                     label = "Quest Title",
                     value = title,
@@ -309,7 +311,6 @@ fun CreateTaskScreen(
                     maxLines = 1,
                 )
 
-                // --- Task Description ---
                 LabeledTextField(
                     label = "Note",
                     value = description,
@@ -317,9 +318,8 @@ fun CreateTaskScreen(
                     maxLines = 3,
                 )
 
-                // --- Difficulty Selector ---
                 DifficultySelector(
-                    selectedXp = xpReward, // Pass current values
+                    selectedXp = xpReward,
                     onDifficultyChange = { xp, gold ->
                         if (!isSaving) {
                             xpReward = xp
@@ -329,7 +329,6 @@ fun CreateTaskScreen(
                     enabled = !isSaving
                 )
 
-                // --- Repeat Task Section ---
                 RepeatTaskSection(
                     isRepeating = isRepeating,
                     onRepeatingChange = { if (!isSaving) isRepeating = it },
@@ -346,7 +345,6 @@ fun CreateTaskScreen(
                     enabled = !isSaving
                 )
 
-                // --- Schedule Section ---
                 if (!isRepeating) {
                     ScheduleSection(
                         startDate = startDate,
@@ -359,37 +357,32 @@ fun CreateTaskScreen(
                     )
                 }
 
-                // --- Assign to Child ---
                 AssignToChildSection(
                     children = childListFromViewModel,
-                    selectedChildrenUids = selectedChildrenUids, // Pass the Set<String> of selected UIDs
+                    selectedChildrenUids = selectedChildrenUids,
                     onChildSelectionChanged = { toggledChildUid ->
                         if (!isSaving) {
-                            // Logic to add or remove the child's UID from the set
                             selectedChildrenUids = if (toggledChildUid in selectedChildrenUids) {
-                                selectedChildrenUids - toggledChildUid // Remove if already selected
+                                selectedChildrenUids - toggledChildUid
                             } else {
-                                selectedChildrenUids + toggledChildUid // Add if not selected
+                                selectedChildrenUids + toggledChildUid
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(), // Optional: Add any modifiers you need
+                    modifier = Modifier.fillMaxWidth(),
                     enabled = !isSaving
                 )
 
-                // --- Icon Picker ---
                 IconPickerSection(
                     selectedIconName = taskIconBaseName,
                     onIconSelected = { newIconBaseName ->
                         if (!isSaving) taskIconBaseName = newIconBaseName
                     },
                     enabled = !isSaving
-                    // defaultIconExtension = ".png" // If not all are .png, you'll need to adjust logic
                 )
                 Spacer(Modifier.height(16.dp))
             }
-            
-            // Loading overlay when saving
+
             if (isSaving) {
                 Box(
                     modifier = Modifier

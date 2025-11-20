@@ -2,61 +2,83 @@ package com.veigar.questtracker.ui.component.createtask
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.veigar.questtracker.model.UserModel
-import com.veigar.questtracker.ui.screen.parent.tab.ChildChip
+import com.veigar.questtracker.ui.theme.CoralBlue
 
 @Composable
 fun AssignToChildSection(
-    modifier: Modifier = Modifier,
     children: List<UserModel>,
-    selectedChildrenUids: Set<String>,      // Changed to Set<String> for multiple UIDs
-    onChildSelectionChanged: (String) -> Unit, // Callback for a single child UID toggle
+    selectedChildrenUids: Set<String>,
+    onChildSelectionChanged: (String) -> Unit,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    val sectionTextColor = Color.White // For titles/text on CoralBlueDark background
-
-    Column(modifier = modifier) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Text(
-            text = "Assign this Quest to:",
+            text = "Assign to",
             style = MaterialTheme.typography.titleMedium,
-            color = sectionTextColor,
-            modifier = Modifier.padding(bottom = 12.dp)
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
         )
-
+        Spacer(modifier = Modifier.height(8.dp))
         if (children.isEmpty()) {
             Text(
-                text = "No children available to assign.",
+                text = "No children linked yet.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = sectionTextColor.copy(alpha = 0.7f),
-                modifier = Modifier.padding(vertical = 8.dp)
+                color = Color.Gray
             )
         } else {
             LazyRow(
-                contentPadding = PaddingValues(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(children, key = { child -> child.getDecodedUid() }) { childUser ->
+                items(children) { child ->
                     ChildChip(
-                        userModel = childUser,
-                        isSelected = childUser.getDecodedUid() in selectedChildrenUids,
-                        onClick = {
-                            if (enabled) {
-                                onChildSelectionChanged(childUser.getDecodedUid())
-                            }
-                        }
+                        name = child.name,
+                        isSelected = selectedChildrenUids.contains(child.getDecodedUid()),
+                        onClick = { onChildSelectionChanged(child.getDecodedUid()) },
+                        enabled = enabled
                     )
                 }
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChildChip(
+    name: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
+    FilterChip(
+        selected = isSelected,
+        onClick = onClick,
+        label = { Text(name) },
+        shape = RoundedCornerShape(20.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = CoralBlue,
+            selectedLabelColor = Color.White
+        ),
+        enabled = enabled
+    )
 }

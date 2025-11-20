@@ -15,6 +15,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.veigar.questtracker.data.FirebaseAuthRepository
 import com.veigar.questtracker.data.GeofenceRepository
 import com.veigar.questtracker.data.NotificationsRepository
+import com.veigar.questtracker.data.QuestRequestRepository
 import com.veigar.questtracker.data.TaskRepository
 import com.veigar.questtracker.data.TaskRepository.observeAllApprovalTasks
 import com.veigar.questtracker.data.UserRepository
@@ -24,6 +25,7 @@ import com.veigar.questtracker.model.GeofenceData
 import com.veigar.questtracker.model.NotificationCategory
 import com.veigar.questtracker.model.NotificationData
 import com.veigar.questtracker.model.NotificationModel
+import com.veigar.questtracker.model.QuestRequestModel
 import com.veigar.questtracker.model.RepeatFrequency
 import com.veigar.questtracker.model.TaskModel
 import com.veigar.questtracker.model.TaskStatus
@@ -91,6 +93,11 @@ class ParentDashboardViewModel : ViewModel() {
 
     private val _errorFetchingAllTasks = MutableStateFlow<String?>(null)
     val errorFetchingAllTasks: StateFlow<String?> = _errorFetchingAllTasks.asStateFlow()
+
+    // Quest Requests
+    private val _questRequests = MutableStateFlow<List<QuestRequestModel>>(emptyList())
+    val questRequests: StateFlow<List<QuestRequestModel>> = _questRequests.asStateFlow()
+    private var questRequestJob: Job? = null
 
     data class ChildTaskProgress(
         val completed: Int = 0,
@@ -188,13 +195,13 @@ class ParentDashboardViewModel : ViewModel() {
                 if (userModel != null) {
                     startObservingParentTasks(userModel.getDecodedUid())
                     loadGeofences()
-                    // FIX: Trigger loadChildLocations whenever user profile updates (links new child)
+                    // FIX: Trigger loadChildLocations whenever user profile updates
                     loadChildLocations()
                 } else {
                     _allParentTasks.value = emptyList()
                 }
                 val currentChildIds = userModel?.linkedChildIds ?: emptyList()
-                if (currentChildIds == _linkedChildren && !_isLoadingChildren.value && _errorFetchingChildren.value == null) {
+                if (currentChildIds == _linkedChildren.value.map { it.uid } && !_isLoadingChildren.value && _errorFetchingChildren.value == null) {
                     return@onEach
                 } else {
                     if (selectedChild.value != null && !currentChildIds.contains(selectedChild.value?.getDecodedUid())) {
@@ -236,6 +243,8 @@ class ParentDashboardViewModel : ViewModel() {
                         _selectedChild.value = null
                     }
                     _isLoadingChildren.value = false
+                    // Refresh locations once children are loaded
+                    loadChildLocations()
                 },
                 onFailure = { exception ->
                     _errorFetchingChildren.value = exception.message ?: "Could not load children."
@@ -250,6 +259,42 @@ class ParentDashboardViewModel : ViewModel() {
         _selectedChild.value = child
         observeChildTasksJob?.cancel()
         observeChildTasksJob = startObservingChildTasks()
+
+        // Observe quest requests for the selected child
+        questRequestJob?.cancel()
+        if (child != null) {
+            startObservingQuestRequests(child.getDecodedUid())
+        } else {
+            _questRequests.value = emptyList()
+        }
+    }
+
+    private fun startObservingQuestRequests(childId: String) {
+        val parentId = _user.value?.getDecodedUid() ?: return
+        questRequestJob = QuestRequestRepository.getQuestRequestsForChild(parentId, childId)
+            .onEach { requests ->
+                _questRequests.value = requests
+            }
+            .catch { e ->
+                Log.e("ParentDashboardVM", "Error fetching quest requests", e)
+                _questRequests.value = emptyList()
+            }
+            .launchIn(viewModelScope)
+    }
+
+    fun rejectQuestRequest(request: QuestRequestModel) {
+        val parentId = _user.value?.getDecodedUid() ?: return
+        viewModelScope.launch {
+            QuestRequestRepository.updateQuestRequestStatus(parentId, request.requestId, "REJECTED")
+            // Optionally send notification to child
+        }
+    }
+
+    fun updateQuestRequestStatus(requestId: String, status: String) {
+        val parentId = _user.value?.getDecodedUid() ?: return
+        viewModelScope.launch {
+            QuestRequestRepository.updateQuestRequestStatus(parentId, requestId, status)
+        }
     }
 
     fun onSelectedTaskChanged(task: TaskModel?) {
@@ -540,6 +585,13 @@ class ParentDashboardViewModel : ViewModel() {
                 )
             }
             .launchIn(viewModelScope)
+    }
+
+    // Add this method to force a refresh from UI
+    fun refreshDashboard() {
+        // Restart user profile observation which triggers children fetch and location updates
+        observeAndFetchUserProfile()
+        loadChildLocations()
     }
 
     fun requestLocationUpdate() {

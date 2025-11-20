@@ -2,7 +2,6 @@ package com.veigar.questtracker.data
 
 import android.annotation.SuppressLint
 import android.content.ContentValues.TAG
-import android.system.Os
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -11,7 +10,6 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.emptyFlow
-
 
 object TaskRepository {
     @SuppressLint("StaticFieldLeak")

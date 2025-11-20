@@ -54,7 +54,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -73,12 +72,12 @@ import com.veigar.questtracker.ui.component.child.SubmitQuest
 import com.veigar.questtracker.ui.component.tasks.QuestDetailSheet
 import com.veigar.questtracker.ui.component.tasks.QuestsSection
 import com.veigar.questtracker.ui.screen.parent.tab.ChildFriendlyLoadingIndicator
-import com.veigar.questtracker.ui.screen.parent.tab.DailyQuestGradientEnd
-import com.veigar.questtracker.ui.screen.parent.tab.DailyQuestGradientStart
-import com.veigar.questtracker.ui.screen.parent.tab.OneTimeQuestGradientEnd
-import com.veigar.questtracker.ui.screen.parent.tab.OneTimeQuestGradientStart
-import com.veigar.questtracker.ui.screen.parent.tab.WeeklyQuestGradientEnd
-import com.veigar.questtracker.ui.screen.parent.tab.WeeklyQuestGradientStart
+import com.veigar.questtracker.ui.theme.DailyQuestGradientEnd
+import com.veigar.questtracker.ui.theme.DailyQuestGradientStart
+import com.veigar.questtracker.ui.theme.OneTimeQuestGradientEnd
+import com.veigar.questtracker.ui.theme.OneTimeQuestGradientStart
+import com.veigar.questtracker.ui.theme.WeeklyQuestGradientEnd
+import com.veigar.questtracker.ui.theme.WeeklyQuestGradientStart
 import com.veigar.questtracker.viewmodel.ChildDashboardViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -91,7 +90,7 @@ fun ChildTasks(
     viewModel: ChildDashboardViewModel
 ) {
     // ---- States for Tasks from ViewModel ----
-    val isLoadingAllTasks by viewModel.isLoadingAllTasks.collectAsStateWithLifecycle() // Use isLoadingAllTasks
+    val isLoadingAllTasks by viewModel.isLoadingAllTasks.collectAsStateWithLifecycle()
     val errorFetchingTasks by viewModel.errorFetchingAllTasks.collectAsStateWithLifecycle()
 
     val dailyTasks by viewModel.dailyTasks.collectAsStateWithLifecycle()
@@ -99,7 +98,6 @@ fun ChildTasks(
     val oneTimeTasks by viewModel.oneTimeTasks.collectAsStateWithLifecycle()
     val claimableTasks by viewModel.claimableTasks.collectAsStateWithLifecycle()
 
-    // NEW: Collect quest requests
     val questRequests by viewModel.questRequests.collectAsStateWithLifecycle()
 
     val hasTasksToShow by viewModel.hasDisplayedTasks.collectAsStateWithLifecycle()
@@ -107,8 +105,8 @@ fun ChildTasks(
     var showQuestInfo by remember { mutableStateOf(false) }
     var showSubmitQuestDialog by remember { mutableStateOf(false) }
     val showQuestRequestDialog by viewModel.showQuestRequestDialog.collectAsStateWithLifecycle()
-    var showEditQuestRequestDialog by remember { mutableStateOf(false) } // New state
-    var selectedQuestRequestForEdit by remember { mutableStateOf<QuestRequestModel?>(null) } // New state
+    var showEditQuestRequestDialog by remember { mutableStateOf(false) }
+    var selectedQuestRequestForEdit by remember { mutableStateOf<QuestRequestModel?>(null) }
 
     val selectedTask by viewModel.selectedTask.collectAsStateWithLifecycle()
 
@@ -174,8 +172,6 @@ fun ChildTasks(
                         )
                     }
                     "content" -> {
-                        // This will be empty as the actual content is outside AnimatedContent
-                        // The purpose here is to manage the visibility of loading/empty/error states
                     }
                 }
             }
@@ -193,7 +189,6 @@ fun ChildTasks(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            // One-Time Quests Section
             if (oneTimeTasks.isNotEmpty()) {
                 QuestsSection(
                     taskList = oneTimeTasks,
@@ -236,12 +231,11 @@ fun ChildTasks(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            // NEW: Requested Quests Section
             if (questRequests.isNotEmpty()) {
                 RequestedQuestsSection(
                     questList = questRequests,
                     title = "Requested Quests",
-                    onQuestRequestClick = { quest -> // Pass the click handler
+                    onQuestRequestClick = { quest ->
                         selectedQuestRequestForEdit = quest
                         showEditQuestRequestDialog = true
                     }
@@ -260,8 +254,8 @@ fun ChildTasks(
                         showQuestInfo = false
                     },
                     onSubmitForApproval = if (canSubmit) { {
-                        showQuestInfo = false // Close the detail sheet
-                        showSubmitQuestDialog = true // Open the submit dialog
+                        showQuestInfo = false
+                        showSubmitQuestDialog = true
                     } } else null,
                     onCancelSubmission = {
                         viewModel.cancelApproval()
@@ -292,7 +286,6 @@ fun ChildTasks(
                     showDialog = showCustomToast,
                     onDismissRequest = {
                         showCustomToast = false
-                        // Removed stat upgrade dialog - no longer showing stats upgrade
                     },
                 )
             }
@@ -317,7 +310,6 @@ fun ChildTasks(
             )
         }
 
-        // NEW: Edit/Delete Quest Request Dialog
         if (showEditQuestRequestDialog && selectedQuestRequestForEdit != null) {
             EditQuestRequestDialog(
                 questRequest = selectedQuestRequestForEdit!!,
@@ -342,7 +334,7 @@ fun RequestedQuestsSection(
     questList: List<QuestRequestModel>,
     title: String,
     emptyDescription: String = "No requested quests to show",
-    onQuestRequestClick: (QuestRequestModel) -> Unit // New click handler
+    onQuestRequestClick: (QuestRequestModel) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -364,7 +356,7 @@ fun RequestedQuestsSection(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 questList.forEach { quest ->
-                    QuestRequestCard(quest = quest, onClick = { onQuestRequestClick(quest) }) // Pass onClick
+                    QuestRequestCard(quest = quest, onClick = { onQuestRequestClick(quest) })
                 }
             }
         }
@@ -372,17 +364,17 @@ fun RequestedQuestsSection(
 }
 
 @Composable
-fun QuestRequestCard(quest: QuestRequestModel, onClick: () -> Unit) { // Updated signature
+fun QuestRequestCard(quest: QuestRequestModel, onClick: () -> Unit) {
     val gradientColors = when (quest.status) {
-        "ACCEPTED" -> listOf(Color(0xFF8BC34A), Color(0xFFC5E1A5)) // Greenish for Accepted
-        "REJECTED" -> listOf(Color(0xFFEF5350), Color(0xFFFFCDD2)) // Reddish for Rejected
-        else -> listOf(Color(0xFF64B5F6), Color(0xFFBBDEFB)) // Blueish for Pending
+        "ACCEPTED" -> listOf(Color(0xFF8BC34A), Color(0xFFC5E1A5))
+        "REJECTED" -> listOf(Color(0xFFEF5350), Color(0xFFFFCDD2))
+        else -> listOf(Color(0xFF64B5F6), Color(0xFFBBDEFB))
     }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick), // Make card clickable
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -413,14 +405,12 @@ fun QuestRequestCard(quest: QuestRequestModel, onClick: () -> Unit) { // Updated
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column {
-                        // Request Date
                         val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
                         Text(
                             text = "Requested: ${dateFormat.format(Date(quest.requestDate))}",
                             color = Color.White.copy(alpha = 0.9f),
                             style = MaterialTheme.typography.bodySmall
                         )
-                        // Rewards
                         quest.rewards?.let { rewards ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
@@ -437,7 +427,7 @@ fun QuestRequestCard(quest: QuestRequestModel, onClick: () -> Unit) { // Updated
                                 )
                                 Spacer(modifier = Modifier.size(8.dp))
                                 Icon(
-                                    imageVector = Icons.Filled.Star, // Assuming star for coins as well for simplicity
+                                    imageVector = Icons.Filled.Star,
                                     contentDescription = "Coins",
                                     tint = Color.White,
                                     modifier = Modifier.size(16.dp)
@@ -451,7 +441,6 @@ fun QuestRequestCard(quest: QuestRequestModel, onClick: () -> Unit) { // Updated
                             }
                         }
                     }
-                    // Status Badge
                     val (statusText, statusIcon, statusColor) = when (quest.status) {
                         "ACCEPTED" -> Triple("Approved", Icons.Default.CheckCircle, Color(0xFF4CAF50))
                         "REJECTED" -> Triple("Rejected", Icons.Default.Close, Color(0xFFF44336))
@@ -503,7 +492,7 @@ fun EditQuestRequestDialog(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Brush.linearGradient(listOf(Color(0xFF42A5F5), Color(0xFF90CAF9)))) // A slightly different blue gradient for editing
+                    .background(Brush.linearGradient(listOf(Color(0xFF42A5F5), Color(0xFF90CAF9))))
                     .padding(16.dp),
                 contentAlignment = Alignment.Center
             ) {
