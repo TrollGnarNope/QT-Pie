@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 
+
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 
@@ -17,6 +18,11 @@ import com.veigar.questtracker.data.HelpCenterRepository;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
+// [Fix 1] Add this import
+import dagger.hilt.android.HiltAndroidApp;
+
+// [Fix 2] Add this annotation
+@HiltAndroidApp // Add this annotation
 public class VeigarApplication extends Application {
     private Context context;
     private Thread.UncaughtExceptionHandler defaultHandler;
@@ -45,7 +51,7 @@ public class VeigarApplication extends Application {
                 PrintWriter pw = new PrintWriter(sw);
                 ex.printStackTrace(pw);
                 String stackTrace = sw.toString();
-                
+
                 // Save crash log to HelpCenterRepository for bug reports
                 HelpCenterRepository.INSTANCE.saveCrashLog(context, stackTrace);
 
