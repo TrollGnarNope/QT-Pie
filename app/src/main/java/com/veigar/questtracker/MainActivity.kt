@@ -49,9 +49,7 @@ class MainActivity : ComponentActivity() {
             QuestTrackerTheme {
                 val navController = rememberNavController()
                 MainNavHost(
-                    navController = navController,
-                    startDestination = NavRoutes.Splash.route,
-                    activityViewModelStoreOwner = activityViewModelStoreOwner
+                    navController = navController
                 )
             }
         }

@@ -232,8 +232,7 @@ fun ChildrenTab(
                                         navController.navigate(NavRoutes.CompletedTasks.createRoute(child.getDecodedUid()))
                                     },
                                     onViewLocationHistory = {
-                                        val parentId = viewModel.user.value?.getDecodedUid() ?: ""
-                                        navController.navigate(NavRoutes.LocationHistory.createRoute(parentId, child.getDecodedUid()))
+                                        navController.navigate(NavRoutes.LocationHistory.createRoute(child.getDecodedUid()))
                                     },
                                     onLocationClick = {
                                         viewModel.setFocusedChild(child.getDecodedUid())

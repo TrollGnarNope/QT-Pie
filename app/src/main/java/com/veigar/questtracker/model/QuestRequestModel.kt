@@ -1,16 +1,19 @@
 package com.veigar.questtracker.model
 
-import com.veigar.questtracker.model.RewardsModel
+import com.google.firebase.Timestamp
 
 data class QuestRequestModel(
-    val requestId: String = "",
+    val requestId: String = "", // Renamed from id to match usage
     val childId: String = "",
     val childName: String = "",
-    val questName: String = "",
-    val questDescription: String = "",
-    val timestamp: Long = System.currentTimeMillis(),
-    val status: String = "PENDING", // PENDING, ACCEPTED, REJECTED
-    val requestDate: Long = System.currentTimeMillis(),
-    val rewards: RewardsModel? = null,
-    val icon: String? = null
+    val childAvatar: Int = 0,
+    val title: String = "",
+    val description: String = "",
+    val category: String = "",
+    val difficulty: String = "",
+    val status: String = "Pending", // Pending, Approved, Declined
+    val createdAt: Timestamp = Timestamp.now(),
+    val rejectionReason: String? = null,
+    val rewards: RewardsModel? = null, // Added
+    val icon: String? = null // Added
 )

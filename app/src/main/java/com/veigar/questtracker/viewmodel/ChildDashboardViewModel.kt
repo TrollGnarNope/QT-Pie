@@ -103,7 +103,7 @@ class ChildDashboardViewModel : ViewModel() {
     // ---- States for ALL Parent\'s Tasks ----
     private val _allParentTasks = MutableStateFlow<List<TaskModel>>(emptyList())
     private val _allChildTasks = MutableStateFlow<List<TaskModel>>(emptyList())
-    // val allParentTasks: StateFlow<List<TaskModel>> = _allParentTasks.asStateFlow() // Not directly exposed
+    val tasks: StateFlow<List<TaskModel>> = _allChildTasks.asStateFlow() // Exposed for ChildTasks.kt
 
     private val _isLoadingAllTasks = MutableStateFlow(false)
     val isLoadingAllTasks: StateFlow<Boolean> = _isLoadingAllTasks.asStateFlow()
@@ -608,6 +608,35 @@ class ChildDashboardViewModel : ViewModel() {
                     _selectedTask.value?.completedStatus?.proofLink ?: "",
                     onSuccess = {},
                     onError = {}
+                )
+            }
+        )
+    }
+
+    fun submitTask(task: TaskModel, proof: String) {
+        val taskToApprove = task.copy(completedStatus = CompleteTaskModel(
+            proofLink = proof,
+            completedAt = System.currentTimeMillis(),
+            status = TaskStatus.AWAITING_APPROVAL,
+            nannyApprove = false
+        ))
+        TaskRepository.addApprovalTask(
+            childId = _user.value?.getDecodedUid()!!,
+            task = taskToApprove,
+            onComplete = { success ->
+                _isLoading.value = false
+                NotificationsRepository.sendNotification(
+                    targetId = _parentProfile.value?.getDecodedUid()!!,
+                    notification = NotificationModel(
+                        title = "Quest Approval!",
+                        message = "${_user.value!!.name} marked ${task.title} for approval",
+                        timestamp = System.currentTimeMillis(),
+                        category = NotificationCategory.TASK_CHANGE,
+                        notificationData = NotificationData(
+                            action = "parent",
+                            content = _user.value?.getDecodedUid()!!
+                        )
+                    )
                 )
             }
         )
@@ -1252,8 +1281,8 @@ class ChildDashboardViewModel : ViewModel() {
                     requestId = UUID.randomUUID().toString(),
                     childId = childId,
                     childName = childName,
-                    questName = questName,
-                    questDescription = questDescription,
+                    title = questName, // Mapped questName to title
+                    description = questDescription, // Mapped questDescription to description
                     rewards = rewards,
                     icon = icon
                 )

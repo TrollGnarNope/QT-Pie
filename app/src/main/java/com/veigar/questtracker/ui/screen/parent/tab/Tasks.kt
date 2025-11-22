@@ -162,8 +162,8 @@ fun TasksTab(
                             onApprove = {
                                 // Navigate to Create Task with pre-filled data
                                 val route = NavRoutes.CreateTask.createRoute(
-                                    title = request.questName,
-                                    desc = request.questDescription,
+                                    title = request.title,
+                                    desc = request.description,
                                     childId = request.childId,
                                     requestId = request.requestId
                                 )
@@ -218,14 +218,14 @@ fun QuestRequestCard(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = request.questName,
+                text = request.title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary
             )
-            if (request.questDescription.isNotBlank()) {
+            if (request.description.isNotBlank()) {
                 Text(
-                    text = request.questDescription,
+                    text = request.description,
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )

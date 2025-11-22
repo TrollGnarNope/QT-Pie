@@ -345,7 +345,7 @@ fun ChildDashboardScreen(navController: NavController, viewModel: ChildDashboard
                                 // Content is always composed
                                 when (tabKey) {
                                     "home" -> ChildHomeTab(navController,viewModel)
-                                    "tasks" -> ChildTasks(navController,viewModel)
+                                    "tasks" -> ChildTasks(viewModel)
                                     "quizzes" -> ChildQuizzesTab(navController, quizViewModel)
                                     "rewards" -> Rewards(navController,viewModel)
                                     "notifications" -> NotificationsTab(navController, childDashboardViewModel = viewModel)
